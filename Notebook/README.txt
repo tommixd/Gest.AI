@@ -1,0 +1,1 @@
+onde se vai experimentar diversos ambientes/técnicas
