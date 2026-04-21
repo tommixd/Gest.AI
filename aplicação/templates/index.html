@@ -70,64 +70,74 @@
 
       <button class="process-btn" id="process-btn" disabled>Processar documentos</button>
 
-      <div class="db-section" style="margin-top: 50px; border-top: 1px solid #eaeaea; padding-top: 30px;">
-        <h2 class="panel-title" style="font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 25px; margin-top: 0;">Arquivados na Base de Dados</h2>
-        
-        {% set titulos_categorias = {
-            'gerado': 'Contratos Gerados',
-            'template': 'Templates Base',
-            'pdf_llm': 'Documentos para Análise (IA)'
-        } %}
+<style>
+  /* Estilos para o Dropdown */
+  .collapsible-header { cursor: pointer; user-select: none; transition: background 0.2s; }
+  .collapsible-header:hover { background-color: #f0f4f8 !important; }
+  .chevron-icon { transition: transform 0.3s; }
+  .collapsed .chevron-icon { transform: rotate(-90deg); }
+  .collapsed + .collapsible-content { display: none; }
+</style>
 
-        {% if documentos_agrupados %}
-            {% for categoria, casos in documentos_agrupados.items() %}
-                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #999; margin-bottom: 12px; margin-top: 25px; display: flex; align-items: center; gap: 10px; font-weight: 500;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    {{ titulos_categorias.get(categoria, categoria | capitalize) }}
-                </h3>
-                
-                {% for caso, docs in casos.items() %}
-                    <div class="grupo-caso" style="margin-bottom: 25px; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden;">
-                        <div class="caso-header" style="background: #f9f9f9; padding: 10px 15px; border-bottom: 1px solid #eaeaea; display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-family: 'Outfit', sans-serif; font-weight: 600; color: #333; display: flex; align-items: center; gap: 8px;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                {{ caso }}
-                            </span>
-                            <span style="font-size: 0.75rem; background: #e0e0e0; padding: 2px 8px; border-radius: 12px; color: #666;">{{ docs|length }} ficheiro(s)</span>
-                        </div>
-                        
-                        <div style="overflow-x: auto; background: #fff;">
-                            <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Outfit', sans-serif; font-size: 0.95rem;">
-                                <thead>
-                                    <tr style="border-bottom: 1px solid #eaeaea; background-color: #fff;">
-                                        <th style="padding: 10px 15px; color: #777; font-weight: 500; font-size: 0.85rem;">Nome do Ficheiro</th>
-                                        <th style="padding: 10px 15px; color: #777; font-weight: 500; font-size: 0.85rem; text-align: right;">Caminho Físico</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for doc in docs %}
-                                    <tr style="border-bottom: 1px solid #f5f5f5; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f4f7fb'" onmouseout="this.style.backgroundColor='transparent'">
-                                        <td style="padding: 10px 15px; font-weight: 400;">
-                                            <a href="/ver_documento/{{ doc.id }}" target="_blank" style="color: #1a73e8; text-decoration: none; display: flex; align-items: center; gap: 8px;">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                                                {{ doc.nome }}
-                                            </a>
-                                        </td>
-                                        <td style="padding: 10px 15px; font-size: 0.8em; color: #999; font-family: 'DM Mono', monospace; text-align: right;">{{ doc.caminho }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% endfor %}
-        {% else %}
-            <div style="text-align: center; padding: 40px; color: #999; background: #fcfcfc; border: 1px dashed #ddd; border-radius: 12px;">
-                <p>Nenhum documento encontrado na Base de Dados.</p>
-            </div>
-        {% endif %}
-      </div>
+        <div class="db-section" style="margin-top: 50px; border-top: 1px solid #eaeaea; padding-top: 30px;">
+          <h2 class="panel-title" style="font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 25px;">Base de Dados</h2>
+          
+          {% set titulos_categorias = {
+              'processamento': 'Contratos em Processamento',
+              'gerado': 'Contratos Gerados',
+              'template': 'Templates Base',
+              'pdf_llm': 'Documentos para Análise (IA)'
+          } %}
+
+          {% if documentos_agrupados %}
+              {% for categoria, casos in documentos_agrupados.items() %}
+                  <!-- Título da Categoria (Clicável) -->
+                  <div class="collapsible-header" onclick="this.classList.toggle('collapsed')" style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #1a1a1a; margin-top: 30px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 8px; background: #f8f9fa; font-weight: 600;">
+                      <span style="display: flex; align-items: center; gap: 10px;">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                          {{ titulos_categorias.get(categoria, categoria | capitalize) }}
+                      </span>
+                      <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                  
+                  <div class="collapsible-content">
+                      {% for caso, docs in casos.items() %}
+                          <div class="grupo-caso" style="margin-bottom: 15px; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden; margin-left: 15px;">
+                              <!-- Cabeçalho do Caso (Clicável) -->
+                              <div class="collapsible-header" onclick="this.classList.toggle('collapsed')" style="background: #ffffff; padding: 12px 15px; border-bottom: 1px solid #eaeaea; display: flex; justify-content: space-between; align-items: center;">
+                                  <span style="font-family: 'Outfit', sans-serif; font-weight: 500; color: #444; display: flex; align-items: center; gap: 8px;">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                      {{ caso }}
+                                  </span>
+                                  <div style="display: flex; align-items: center; gap: 10px;">
+                                      <span style="font-size: 0.75rem; background: #f0f0f0; padding: 2px 8px; border-radius: 12px; color: #777;">{{ docs|length }} ficheiro(s)</span>
+                                      <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                  </div>
+                              </div>
+                              
+                              <div class="collapsible-content">
+                                  <table style="width: 100%; border-collapse: collapse; font-family: 'Outfit', sans-serif; font-size: 0.9rem;">
+                                      <tbody style="background: white;">
+                                          {% for doc in docs %}
+                                          <tr style="border-bottom: 1px solid #f9f9f9;">
+                                              <td style="padding: 10px 15px;">
+                                                  <a href="/ver_documento/{{ doc.id }}" target="_blank" style="color: #1a73e8; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                                      {{ doc.nome }}
+                                                  </a>
+                                              </td>
+                                              <td style="padding: 10px 15px; font-size: 0.75rem; color: #aaa; text-align: right;">{{ doc.caminho }}</td>
+                                          </tr>
+                                          {% endfor %}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          </div>
+                      {% endfor %}
+                  </div>
+              {% endfor %}
+          {% endif %}
+        </div>
     </div>
   </main>
 

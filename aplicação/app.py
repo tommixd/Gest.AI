@@ -106,39 +106,39 @@ def index():
     cursor = db.execute("SELECT * FROM documentos ORDER BY categoria, nome")
     lista_documentos = cursor.fetchall()
     
-    documentos_agrupados = {}
+    # Definimos a ordem e inicializamos as categorias
+    documentos_agrupados = {
+        'processamento': {}, # Fica no topo
+        'gerado': {},
+        'template': {},
+        'pdf_llm': {}
+    }
     
-    # IMPORTANTE: Se o app.py está dentro da pasta 'aplicação', 
-    # a RAIZ do projeto é a pasta de cima.
-    ROOT_PROJECT = os.path.dirname(BASE_DIR) 
-
+    ROOT_DIR = os.path.dirname(BASE_DIR)
+    
     for doc in lista_documentos:
-        caminho_db = doc['caminho']
-        
-        # Resolve o caminho: se o caminho na BD já começa com 'aplicação/', removemos
-        if caminho_db.startswith('aplicação/'):
-            caminho_db = caminho_db.replace('aplicação/', '', 1)
-            
-        caminho_absoluto = os.path.join(ROOT_PROJECT, caminho_db).replace('\\', '/')
-        
-        if not os.path.exists(caminho_absoluto):
-            # Se ainda assim não encontrar, tenta relativo à pasta atual
-            caminho_absoluto = os.path.join(BASE_DIR, caminho_db).replace('\\', '/')
-            if not os.path.exists(caminho_absoluto):
-                print(f"[Aviso] Ficheiro não encontrado no disco: {caminho_absoluto}")
-                continue 
+        caminho_absoluto = os.path.join(ROOT_DIR, doc['caminho'])
+        if not os.path.exists(caminho_absoluto): continue 
 
         cat = doc['categoria']
         if cat not in documentos_agrupados: documentos_agrupados[cat] = {}
 
-        if cat == 'gerado':
-            partes = caminho_db.split('/')
-            caso = partes[-2].replace('_', ' ') if len(partes) >= 2 else "Documentos Gerais"
-            if caso not in documentos_agrupados[cat]: documentos_agrupados[cat][caso] = []
+        # Agrupamento por CASO para 'gerado' e 'processamento'
+        if cat in ['gerado', 'processamento']:
+            partes = doc['caminho'].split('/')
+            caso = partes[-2].replace('_', ' ') if len(partes) >= 4 else "Documentos Gerais"
+                
+            if caso not in documentos_agrupados[cat]:
+                documentos_agrupados[cat][caso] = []
             documentos_agrupados[cat][caso].append(doc)
         else:
-            if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = []
+            # Agrupamento simples para o resto
+            if 'Geral' not in documentos_agrupados[cat]:
+                documentos_agrupados[cat]['Geral'] = []
             documentos_agrupados[cat]['Geral'].append(doc)
+    
+    # Remove categorias que não têm ficheiros para não aparecerem vazias
+    documentos_agrupados = {k: v for k, v in documentos_agrupados.items() if v}
     
     return render_template('index.html', documentos_agrupados=documentos_agrupados)
 
