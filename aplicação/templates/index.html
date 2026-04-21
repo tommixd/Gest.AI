@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gest.AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <header>
+    <div class="logo">Gest<span>.AI</span></div>
+    <nav style="display: flex; gap: 10px; align-items: center;">
+      <button class="nav-btn active" data-panel="chat">Assistente</button>
+      <button class="nav-btn" data-panel="upload">Documentos</button>
+      <!-- Botão de Novo Processo no Topo -->
+      <button class="nav-btn" id="btn-novo-processo" style="background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#1557b0'" onmouseout="this.style.background='#1a73e8'">
+        + Novo Processo
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="panel active" id="panel-chat">
+      <div class="panel-header">
+        <h1 class="panel-title">Assistente</h1>
+      </div>
+
+      <div class="chat-window" id="chat-window">
+        <div class="msg bot">
+          <div class="msg-avatar">AI</div>
+          <div class="msg-bubble">Olá! Como posso ajudar?</div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <textarea id="chat-input" rows="1" placeholder="Escreve uma mensagem…"></textarea>
+        <button class="send-btn" id="send-btn" title="Enviar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-upload">
+      <div class="panel-header">
+        <h1 class="panel-title">Documentos</h1>
+      </div>
+
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.csv,.xlsx" />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <p class="upload-title">Arrasta ficheiros ou clica para escolher</p>
+      </div>
+
+      <div class="file-list" id="file-list">
+        <div class="empty-state" id="empty-state">
+          <p>Ainda não há ficheiros carregados.</p>
+        </div>
+      </div>
+
+      <button class="process-btn" id="process-btn" disabled>Processar documentos</button>
+
+      <div class="db-section" style="margin-top: 50px; border-top: 1px solid #eaeaea; padding-top: 30px;">
+        <h2 class="panel-title" style="font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 25px; margin-top: 0;">Arquivados na Base de Dados</h2>
+        
+        {% set titulos_categorias = {
+            'gerado': 'Contratos Gerados',
+            'template': 'Templates Base',
+            'pdf_llm': 'Documentos para Análise (IA)'
+        } %}
+
+        {% if documentos_agrupados %}
+            {% for categoria, casos in documentos_agrupados.items() %}
+                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #999; margin-bottom: 12px; margin-top: 25px; display: flex; align-items: center; gap: 10px; font-weight: 500;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    {{ titulos_categorias.get(categoria, categoria | capitalize) }}
+                </h3>
+                
+                {% for caso, docs in casos.items() %}
+                    <div class="grupo-caso" style="margin-bottom: 25px; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden;">
+                        <div class="caso-header" style="background: #f9f9f9; padding: 10px 15px; border-bottom: 1px solid #eaeaea; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-family: 'Outfit', sans-serif; font-weight: 600; color: #333; display: flex; align-items: center; gap: 8px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                {{ caso }}
+                            </span>
+                            <span style="font-size: 0.75rem; background: #e0e0e0; padding: 2px 8px; border-radius: 12px; color: #666;">{{ docs|length }} ficheiro(s)</span>
+                        </div>
+                        
+                        <div style="overflow-x: auto; background: #fff;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Outfit', sans-serif; font-size: 0.95rem;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid #eaeaea; background-color: #fff;">
+                                        <th style="padding: 10px 15px; color: #777; font-weight: 500; font-size: 0.85rem;">Nome do Ficheiro</th>
+                                        <th style="padding: 10px 15px; color: #777; font-weight: 500; font-size: 0.85rem; text-align: right;">Caminho Físico</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in docs %}
+                                    <tr style="border-bottom: 1px solid #f5f5f5; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f4f7fb'" onmouseout="this.style.backgroundColor='transparent'">
+                                        <td style="padding: 10px 15px; font-weight: 400;">
+                                            <a href="/ver_documento/{{ doc.id }}" target="_blank" style="color: #1a73e8; text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                                {{ doc.nome }}
+                                            </a>
+                                        </td>
+                                        <td style="padding: 10px 15px; font-size: 0.8em; color: #999; font-family: 'DM Mono', monospace; text-align: right;">{{ doc.caminho }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; padding: 40px; color: #999; background: #fcfcfc; border: 1px dashed #ddd; border-radius: 12px;">
+                <p>Nenhum documento encontrado na Base de Dados.</p>
+            </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal de Seleção de Processo -->
+  <div id="modal-processo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div style="background: white; padding: 30px; border-radius: 16px; max-width: 450px; width: 90%; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+      <button id="fechar-modal" style="position: absolute; top: 15px; right: 15px; border: none; background: none; font-size: 1.8rem; cursor: pointer; color: #888;">&times;</button>
+      
+      <h2 style="font-family: 'DM Serif Display', serif; color: #1a1a1a; margin-bottom: 10px; font-size: 1.8rem;">Novo Processo</h2>
+      <p style="color: #666; margin-bottom: 25px; font-family: 'Outfit', sans-serif;">Selecione o tipo de contratação que deseja iniciar:</p>
+      
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <a href="/contratacao/renovacao-integral" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
+          <span style="font-size: 1.5rem;"></span>
+          <div>
+            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Renovação: Tempo Integral</div>
+            <div style="font-size: 0.8rem; color: #888;">Regime de tempo integral</div>
+          </div>
+        </a>
+        <a href="/contratacao/renovacao-parcial" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
+          <span style="font-size: 1.5rem;"></span>
+          <div>
+            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Renovação: Tempo Parcial</div>
+            <div style="font-size: 0.8rem; color: #888;">Regime de tempo parcial</div>
+          </div>
+        </a>
+        <a href="/contratacao/primeira-vez" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
+          <span style="font-size: 1.5rem;"></span>
+          <div>
+            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Primeira Contratação</div>
+            <div style="font-size: 0.8rem; color: #888;">Novo colaborador (Tempo Parcial)</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ── NAV ──
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const panels  = document.querySelectorAll('.panel');
+
+    navBtns.forEach(btn => {
+      if (btn.id !== 'btn-novo-processo') {
+        btn.addEventListener('click', () => {
+          navBtns.forEach(b => b.classList.remove('active'));
+          panels.forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+        });
+      }
+    });
+
+    // ── MODAL NOVO PROCESSO ──
+    const btnNovo = document.getElementById('btn-novo-processo');
+    const modal = document.getElementById('modal-processo');
+    const btnFechar = document.getElementById('fechar-modal');
+
+    btnNovo.addEventListener('click', (e) => {
+      e.preventDefault();
+      modal.style.display = 'flex';
+    });
+
+    btnFechar.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+      if (e.target == modal) {
+        modal.style.display = 'none';
+      }
+    });
+
+    // ── TOAST ──
+    function showToast(msg, duration = 2800) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    // ── CHAT ──
+    const chatWindow = document.getElementById('chat-window');
+    const chatInput  = document.getElementById('chat-input');
+    const sendBtn    = document.getElementById('send-btn');
+
+    function addMessage(text, role) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + role;
+      const avatar = document.createElement('div');
+      avatar.className = 'msg-avatar';
+      avatar.textContent = role === 'user' ? 'TU' : 'AI';
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      bubble.textContent = text;
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+      chatWindow.appendChild(wrap);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+      return wrap;
+    }
+
+    function showTyping() {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg bot';
+      wrap.id = 'typing';
+      wrap.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+      chatWindow.appendChild(wrap);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function removeTyping() {
+      const el = document.getElementById('typing');
+      if (el) el.remove();
+    }
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+      addMessage(text, 'user');
+      showTyping();
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        removeTyping();
+        if (res.ok) {
+          const data = await res.json();
+          addMessage(data.reply || data.response || 'Sem resposta.', 'bot');
+        } else {
+          addMessage('Erro ao contactar o servidor.', 'bot');
+        }
+      } catch {
+        removeTyping();
+        addMessage('Não foi possível ligar ao servidor.', 'bot');
+      }
+
+      sendBtn.disabled = false;
+      chatInput.focus();
+    }
+
+    // ── UPLOAD ──
+    const fileInput  = document.getElementById('file-input');
+    const fileList   = document.getElementById('file-list');
+    const emptyState = document.getElementById('empty-state');
+    const processBtn = document.getElementById('process-btn');
+    const uploadZone = document.getElementById('upload-zone');
+
+    let files = [];
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function renderFiles() {
+      fileList.innerHTML = '';
+      if (files.length === 0) {
+        fileList.appendChild(emptyState);
+        processBtn.disabled = true;
+        return;
+      }
+      processBtn.disabled = false;
+      files.forEach((f, i) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `
+          <div class="file-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+          </div>
+          <div class="file-info">
+            <div class="file-name">${f.name}</div>
+            <div class="file-meta">${formatSize(f.size)}</div>
+          </div>
+          <span class="file-status ready">pronto</span>
+          <button class="remove-btn" data-index="${i}" title="Remover">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>`;
+        fileList.appendChild(item);
+      });
+
+      fileList.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          files.splice(parseInt(btn.dataset.index), 1);
+          renderFiles();
+        });
+      });
+    }
+
+    fileInput.addEventListener('change', () => {
+      files = [...files, ...Array.from(fileInput.files)];
+      fileInput.value = '';
+      renderFiles();
+    });
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      files = [...files, ...Array.from(e.dataTransfer.files)];
+      renderFiles();
+    });
+
+    processBtn.addEventListener('click', async () => {
+      if (files.length === 0) return;
+      processBtn.disabled = true;
+      processBtn.textContent = 'A processar…';
+
+      const formData = new FormData();
+      files.forEach(f => formData.append('files', f));
+
+      try {
+        const res = await fetch('/processar_documentos', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) {
+          showToast('Documentos processados com sucesso.');
+          files = [];
+          renderFiles();
+          setTimeout(() => window.location.reload(), 1500); 
+        } else {
+          showToast('Erro ao processar os documentos.');
+        }
+      } catch {
+        showToast('Não foi possível ligar ao servidor.');
+      }
+
+      processBtn.disabled = false;
+      processBtn.textContent = 'Processar documentos';
+    });
+
+    renderFiles();
+  </script>
+
+</body>
+</html>
