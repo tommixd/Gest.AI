@@ -33,7 +33,8 @@ def popular_bd(conn, cursor):
         'pdfs_teste' : 'pdf_llm',
         'Modelos Contratuais/Modelos Gerados': 'gerado',
         'Modelos Contratuais/tempo integral anual': 'tempo integral anual',
-        'Modelos Contratuais/tempo parcial semestral': 'tempo parcial semestral'
+        'Modelos Contratuais/tempo parcial semestral': 'tempo parcial semestral',
+        'Modelos Contratuais/tempo parcial edital': 'tempo parcial edital'
     }
 
     documentos_inseridos = 0

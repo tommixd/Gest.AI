@@ -86,7 +86,7 @@ def close_connection(exception):
 
 NOTEBOOK_PATH = Path(__file__).parent.parent / 'Notebook'
 
-@app.route('/notebooks/<notebook_name>')
+'''@app.route('/notebooks/<notebook_name>')
 def view_notebook(notebook_name):
     notebook_file = NOTEBOOK_PATH / f'{notebook_name}.ipynb'
     if not notebook_file.exists():
@@ -98,10 +98,11 @@ def view_notebook(notebook_name):
     exporter = HTMLExporter()
     exporter.template_name = 'basic'    
     html_body, _ = exporter.from_notebook_node(notebook)
-    return html_body
+    return html_body ''' #não vale a pena ter porque já não se utiliza os notebooks
 
 @app.route('/')  
 def index():
+    print(f"[*] A ler base de dados de: {os.path.abspath(DATABASE)}")
     db = get_db()
     cursor = db.execute("SELECT * FROM documentos ORDER BY categoria, nome")
     lista_documentos = cursor.fetchall()

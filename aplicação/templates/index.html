@@ -178,215 +178,110 @@
   <div id="toast"></div>
 
   <script>
-    // ── NAV ──
-    const navBtns = document.querySelectorAll('.nav-btn');
-    const panels  = document.querySelectorAll('.panel');
+  // --- FUNÇÕES DE NAVEGAÇÃO ---
+  const navBtns = document.querySelectorAll('.nav-btn');
+  const panels  = document.querySelectorAll('.panel');
 
-    navBtns.forEach(btn => {
-      if (btn.id !== 'btn-novo-processo') {
-        btn.addEventListener('click', () => {
-          navBtns.forEach(b => b.classList.remove('active'));
-          panels.forEach(p => p.classList.remove('active'));
-          btn.classList.add('active');
-          document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
-        });
-      }
-    });
-
-    // ── MODAL NOVO PROCESSO ──
-    const btnNovo = document.getElementById('btn-novo-processo');
-    const modal = document.getElementById('modal-processo');
-    const btnFechar = document.getElementById('fechar-modal');
-
-    btnNovo.addEventListener('click', (e) => {
-      e.preventDefault();
-      modal.style.display = 'flex';
-    });
-
-    btnFechar.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-
-    window.addEventListener('click', (e) => {
-      if (e.target == modal) {
-        modal.style.display = 'none';
-      }
-    });
-
-    // ── TOAST ──
-    function showToast(msg, duration = 2800) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), duration);
+  navBtns.forEach(btn => {
+    if (btn.id !== 'btn-novo-processo') {
+      btn.addEventListener('click', () => {
+        navBtns.forEach(b => b.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById('panel-' + btn.dataset.panel);
+        if(target) target.classList.add('active');
+      });
     }
+  });
 
-    // ── CHAT ──
-    const chatWindow = document.getElementById('chat-window');
-    const chatInput  = document.getElementById('chat-input');
-    const sendBtn    = document.getElementById('send-btn');
+  // --- MODAL NOVO PROCESSO ---
+  const btnNovo = document.getElementById('btn-novo-processo');
+  const modal = document.getElementById('modal-processo');
+  const btnFechar = document.getElementById('fechar-modal');
+  if(btnNovo) btnNovo.onclick = () => modal.style.display = 'flex';
+  if(btnFechar) btnFechar.onclick = () => modal.style.display = 'none';
+  window.onclick = (e) => { if (e.target == modal) modal.style.display = 'none'; }
 
-    function addMessage(text, role) {
-      const wrap = document.createElement('div');
-      wrap.className = 'msg ' + role;
-      const avatar = document.createElement('div');
-      avatar.className = 'msg-avatar';
-      avatar.textContent = role === 'user' ? 'TU' : 'AI';
-      const bubble = document.createElement('div');
-      bubble.className = 'msg-bubble';
-      bubble.textContent = text;
-      wrap.appendChild(avatar);
-      wrap.appendChild(bubble);
-      chatWindow.appendChild(wrap);
+  // --- FUNÇÃO DE DROPDOWN (ACORDÉON) ---
+  function toggleSection(element) {
+    element.classList.toggle('collapsed');
+  }
+
+  // --- LÓGICA DO CHAT (CORRIGIDA) ---
+  const chatWindow = document.getElementById('chat-window');
+  const chatInput  = document.getElementById('chat-input');
+  const sendBtn    = document.getElementById('send-btn');
+
+  async function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    // Bloqueia o input enquanto processa
+    chatInput.value = '';
+    chatInput.disabled = true;
+    sendBtn.disabled = true;
+
+    // Adiciona mensagem do utilizador
+    const userMsg = document.createElement('div');
+    userMsg.className = 'msg user';
+    userMsg.innerHTML = `<div class="msg-avatar">TU</div><div class="msg-bubble">${text}</div>`;
+    chatWindow.appendChild(userMsg);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    // Mostra indicador de "a escrever..."
+    const typingMsg = document.createElement('div');
+    typingMsg.className = 'msg bot';
+    typingMsg.id = 'typing-indicator';
+    typingMsg.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble">...</div>`;
+    chatWindow.appendChild(typingMsg);
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+      
+      const data = await res.json();
+      
+      // Remove indicador e adiciona resposta
+      if(document.getElementById('typing-indicator')) document.getElementById('typing-indicator').remove();
+      
+      const botMsg = document.createElement('div');
+      botMsg.className = 'msg bot';
+      botMsg.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble">${data.reply || "Sem resposta."}</div>`;
+      chatWindow.appendChild(botMsg);
       chatWindow.scrollTop = chatWindow.scrollHeight;
-      return wrap;
-    }
 
-    function showTyping() {
-      const wrap = document.createElement('div');
-      wrap.className = 'msg bot';
-      wrap.id = 'typing';
-      wrap.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
-      chatWindow.appendChild(wrap);
-      chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
-
-    function removeTyping() {
-      const el = document.getElementById('typing');
-      if (el) el.remove();
-    }
-
-    async function sendMessage() {
-      const text = chatInput.value.trim();
-      if (!text) return;
-      chatInput.value = '';
-      chatInput.style.height = 'auto';
-      addMessage(text, 'user');
-      showTyping();
-      sendBtn.disabled = true;
-
-      try {
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
-        });
-        removeTyping();
-        if (res.ok) {
-          const data = await res.json();
-          addMessage(data.reply || data.response || 'Sem resposta.', 'bot');
-        } else {
-          addMessage('Erro ao contactar o servidor.', 'bot');
-        }
-      } catch {
-        removeTyping();
-        addMessage('Não foi possível ligar ao servidor.', 'bot');
-      }
-
+    } catch (e) {
+      if(document.getElementById('typing-indicator')) document.getElementById('typing-indicator').remove();
+      console.error("Erro no chat:", e);
+    } finally {
+      chatInput.disabled = false;
       sendBtn.disabled = false;
       chatInput.focus();
     }
+  }
 
-    // ── UPLOAD ──
-    const fileInput  = document.getElementById('file-input');
-    const fileList   = document.getElementById('file-list');
-    const emptyState = document.getElementById('empty-state');
-    const processBtn = document.getElementById('process-btn');
-    const uploadZone = document.getElementById('upload-zone');
-
-    let files = [];
-
-    function formatSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / 1048576).toFixed(1) + ' MB';
-    }
-
-    function renderFiles() {
-      fileList.innerHTML = '';
-      if (files.length === 0) {
-        fileList.appendChild(emptyState);
-        processBtn.disabled = true;
-        return;
-      }
-      processBtn.disabled = false;
-      files.forEach((f, i) => {
-        const item = document.createElement('div');
-        item.className = 'file-item';
-        item.innerHTML = `
-          <div class="file-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-          </div>
-          <div class="file-info">
-            <div class="file-name">${f.name}</div>
-            <div class="file-meta">${formatSize(f.size)}</div>
-          </div>
-          <span class="file-status ready">pronto</span>
-          <button class="remove-btn" data-index="${i}" title="Remover">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>`;
-        fileList.appendChild(item);
-      });
-
-      fileList.querySelectorAll('.remove-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          files.splice(parseInt(btn.dataset.index), 1);
-          renderFiles();
-        });
-      });
-    }
-
-    fileInput.addEventListener('change', () => {
-      files = [...files, ...Array.from(fileInput.files)];
-      fileInput.value = '';
-      renderFiles();
-    });
-
-    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-    uploadZone.addEventListener('drop', e => {
+  // Evento de Clique
+  if(sendBtn) {
+    sendBtn.onclick = (e) => {
       e.preventDefault();
-      uploadZone.classList.remove('drag-over');
-      files = [...files, ...Array.from(e.dataTransfer.files)];
-      renderFiles();
-    });
+      sendMessage();
+    };
+  }
 
-    processBtn.addEventListener('click', async () => {
-      if (files.length === 0) return;
-      processBtn.disabled = true;
-      processBtn.textContent = 'A processar…';
-
-      const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
-
-      try {
-        const res = await fetch('/processar_documentos', {
-          method: 'POST',
-          body: formData
-        });
-        if (res.ok) {
-          showToast('Documentos processados com sucesso.');
-          files = [];
-          renderFiles();
-          setTimeout(() => window.location.reload(), 1500); 
-        } else {
-          showToast('Erro ao processar os documentos.');
-        }
-      } catch {
-        showToast('Não foi possível ligar ao servidor.');
+  // Evento de Tecla Enter
+  if(chatInput) {
+    chatInput.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Impede a nova linha
+        sendMessage();
       }
+    };
+  }
+</script>
 
-      processBtn.disabled = false;
-      processBtn.textContent = 'Processar documentos';
-    });
-
-    renderFiles();
-  </script>
 
 </body>
 </html>
