@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novo Processo - Gest.AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --primary: #1a73e8; --bg: #f5f7fa; --text: #333; --border: #ddd; }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+    .container { max-width: 850px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin-bottom: 10px; color: #1a1a1a; }
+    .subtitle { color: #666; margin-bottom: 30px; }
+    .section-title { font-size: 1.2rem; font-weight: 600; border-bottom: 2px solid #eee; padding-bottom: 8px; margin: 35px 0 20px; color: var(--primary); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .full-width { grid-column: span 2; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.95rem; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
+    input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
+    .info-badge { background: #e8f0fe; color: var(--primary); padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px; display: inline-block; }
+    .actions { margin-top: 40px; display: flex; gap: 15px; justify-content: flex-end; }
+    .btn { padding: 12px 28px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; border: none; font-size: 1rem; }
+    .btn-save { background: var(--primary); color: white; }
+    .btn-save:hover { background: #1557b0; }
+    .btn-cancel { background: #eee; color: #666; }
+    .btn-cancel:hover { background: #ddd; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>{{ titulo }}</h1>
+  <p class="subtitle">Preencha os dados necessários para gerar os documentos do processo.</p>
+  
+  <div class="info-badge">Regime: {{ regime_nome }}</div>
+
+  <form id="formContratacao">
+    <input type="hidden" name="tipo" value="{{ tipo }}">
+    <input type="hidden" name="tipo_contrato" value="{{ tipo_contrato }}">
+
+    <!-- SEÇÃO: DADOS GERAIS -->
+    <div class="section-title">Dados do Docente e Contratação</div>
+    <div class="form-grid">
+      <div class="form-group full-width">
+        <label>Nome Completo do Docente *</label>
+        <input type="text" name="{{nome_docente}}" required placeholder="Ex: Prof. Dr. Helena Pinto">
+      </div>
+      <div class="form-group">
+        <label>Data de Início *</label>
+        <input type="date" name="{{data_inicio_contrato}}" required>
+      </div>
+      <div class="form-group">
+        <label>Data de Fim *</label>
+        <input type="date" name="{{data_fim_contrato}}" required>
+      </div>
+      <div class="form-group">
+        <label>Ano Letivo *</label>
+        <input type="text" name="{{ano_letivo}}" required placeholder="Ex: 2025/2026">
+      </div>
+      <div class="form-group">
+        <label>Ano Anterior *</label>
+        <input type="text" name="{{ano_anterior}}" required placeholder="Ex: 2024/2025">
+      </div>
+      <div class="form-group">
+        <label>Área de Contratação *</label>
+        <input type="text" name="{{area_contratacao}}" required placeholder="Ex: Informática">
+      </div>
+      <div class="form-group">
+        <label>Áreas Curriculares *</label>
+        <input type="text" name="{{areas_curriculares}}" required placeholder="Ex: Matemática e Física">
+      </div>
+      <div class="form-group full-width">
+        <label>Funções Externas</label>
+        <input type="text" name="{{funcoes_externas}}" value="Não exerce funções externas">
+      </div>
+    </div>
+
+    <!-- SEÇÃO: JÚRI -->
+    <div class="section-title">Membros do Júri</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Professor A</label><input type="text" name="{{profAAA}}" required></div>
+      <div class="form-group"><label>Professor B</label><input type="text" name="{{profBBB}}" required></div>
+      <div class="form-group"><label>Professor C</label><input type="text" name="{{profCCC}}" required></div>
+      <div class="form-group"><label>Professor D</label><input type="text" name="{{profDDD}}" required></div>
+      <div class="form-group full-width"><label>Presidente do Júri / Diretor</label><input type="text" name="{{profXXX}}" required></div>
+    </div>
+
+    <!-- SEÇÃO: UNIDADES CURRICULARES (Oculta se não for renovação) -->
+    <div id="section-ucs" class="{% if tipo == 'novoContrato' %}hidden{% endif %}">
+      <div class="section-title">Distribuição de Serviço (UCs)</div>
+      <div class="form-grid">
+        <div class="form-group"><label>UC 1</label><input type="text" name="{{uc_1}}"></div>
+        <div class="form-group"><label>Horas UC 1</label><input type="number" name="{{horas_1}}"></div>
+        <div class="form-group"><label>Curso UC 1</label><input type="text" name="{{curso_1}}"></div>
+        <div class="form-group"><label>Ciclo UC 1</label><input type="text" name="{{ciclo_1}}"></div>
+        
+        <div class="form-group"><label>UC 2</label><input type="text" name="{{uc_2}}"></div>
+        <div class="form-group"><label>Horas UC 2</label><input type="number" name="{{horas_2}}"></div>
+        <div class="form-group"><label>Curso UC 2</label><input type="text" name="{{curso_2}}"></div>
+        <div class="form-group"><label>Ciclo UC 2</label><input type="text" name="{{ciclo_2}}"></div>
+
+        <div class="form-group full-width"><label>Total de Horas de Contacto</label><input type="number" name="{{total_horas_contacto}}"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Observações</div>
+    <div class="form-group">
+      <textarea name="{{relatorio_juri}}" placeholder="Relatório ou notas adicionais..."></textarea>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn btn-cancel" onclick="window.location.href='/'">Cancelar</button>
+      <button type="submit" class="btn btn-save">Gerar Processo Completo</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('formContratacao').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('.btn-save');
+    btn.disabled = true;
+    btn.innerText = 'A gerar documentos...';
+
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+
+    try {
+      const response = await fetch('/submeter-contratacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        alert('Processo e documentos gerados com sucesso!');
+        window.location.href = '/';
+      } else {
+        alert('Erro ao gerar processo. Verifique se os templates existem na BD.');
+        btn.disabled = false;
+        btn.innerText = 'Gerar Processo Completo';
+      }
+    } catch (err) {
+      alert('Erro de ligação ao servidor.');
+      btn.disabled = false;
+      btn.innerText = 'Gerar Processo Completo';
+    }
+  };
+</script>
+
+</body>
+</html>

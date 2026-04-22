@@ -13,7 +13,8 @@ DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'documentos.
 # Associa o que vem do teu JSON à categoria exata que tens na tua BD
 CATEGORIA_POR_TIPO = {
     "integral": "tempo integral anual",
-    "parcial": "tempo parcial semestral"
+    "parcial": "tempo parcial semestral",
+    "parcial-edital": "tempo parcial edital"
 }
 
 # Pasta principal onde os documentos preenchidos vão ser guardados
