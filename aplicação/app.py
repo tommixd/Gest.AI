@@ -65,7 +65,7 @@ thread_ia.start()
 CATEGORIA_POR_TIPO = {
     "renovacao-integral": "tempo integral anual",
     "renovacao-parcial": "tempo parcial semestral",
-    "novo-contrato": "tempo parcial edital"  # Corrigido para Edital
+    "primeira-vez": "tempo parcial edital"  # Corrigido para Edital
 }
 
 def criar_nome_pasta_limpo(nome_completo):
@@ -85,7 +85,7 @@ def processar_templates(dados_formulario, tipo_contratacao):
         print(f"[!] Erro: Tipo de contratação '{tipo_contratacao}' não mapeado.")
         return None, f"Tipo de contratação '{tipo_contratacao}' não reconhecido."
 
-    nome_docente = dados_formulario.get("{{nome_docente}}", "Docente_Desconhecido")
+    nome_docente = dados_formulario.get("nome_docente", "Docente_Desconhecido")
     nome_subpasta = criar_nome_pasta_limpo(nome_docente)
     
     # Resolver caminhos absolutos
@@ -228,7 +228,8 @@ def iniciar_contratacao(tipo):
     return render_template('contratacao.html', 
                            titulo=titulo, 
                            regime_nome=regime_nome, 
-                           tipo=tipo)
+                           tipo=tipo,
+                           tipo_contrato=tipo)
 
 
 @app.route('/submeter-contratacao', methods=['POST'])
@@ -241,7 +242,7 @@ def submeter_contratacao():
     tipo = dados.get('tipo')
     
     # Validação: o nome do docente é obrigatório para criar a pasta e registar na BD
-    nome_docente_raw = dados.get('{{nome_docente}}')
+    nome_docente_raw = dados.get('nome_docente')
     if not nome_docente_raw or not tipo:
         return jsonify({"erro": "Dados incompletos: O nome do docente é obrigatório."}), 400
     

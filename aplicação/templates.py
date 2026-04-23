@@ -42,7 +42,8 @@ def processar_renovacao(dados_contrato):
     print(f"[*] A processar contratação do tipo: {tipo_contrato.upper()} (Categoria BD: '{categoria_bd}')")
 
     # 2. Criar a subpasta do docente
-    nome_docente = dados_contrato.get("{{nome_docente}}", "Docente_Desconhecido")
+    # [ALTERAÇÃO] Retiradas as chaves da pesquisa pelo nome, visto que o HTML envia agora "nome_docente"
+    nome_docente = dados_contrato.get("nome_docente", "Docente_Desconhecido")
     nome_subpasta = criar_nome_pasta_limpo(nome_docente)
     caminho_final = os.path.join(pasta_output, nome_subpasta)
     
@@ -85,25 +86,34 @@ def processar_renovacao(dados_contrato):
         try:
             documento = docx.Document(caminho_template)
 
-            # Substituir nos parágrafos normais
-            for paragrafo in documento.paragraphs:
-                for chave, valor in dados_contrato.items():
-                    if chave in paragrafo.text:
-                        paragrafo.text = paragrafo.text.replace(chave, str(valor))
+            # Criamos um dicionário de substituição limpo
+            # Isto garante que 'nome_docente' e '{{nome_docente}}' funcionem
+            mapa_substituicao = {}
+            for k, v in dados_contrato.items():
+                chave_limpa = k.replace("{", "").replace("}", "").strip()
+                mapa_substituicao[f"{{{{{chave_limpa}}}}}"] = str(v)
 
-            # Substituir nas tabelas
+            # Função auxiliar para substituir texto em parágrafos e tabelas
+            def substituir_texto(container):
+                for p in container:
+                    for tag, valor in mapa_substituicao.items():
+                        if tag in p.text:
+                            # [CORREÇÃO CRÍTICA] Fazemos a substituição direta
+                            p.text = p.text.replace(tag, valor)
+
+            # Aplicar nos parágrafos
+            substituir_texto(documento.paragraphs)
+
+            # Aplicar em todas as tabelas
             for tabela in documento.tables:
                 for linha in tabela.rows:
                     for celula in linha.cells:
-                        for paragrafo in celula.paragraphs:
-                            for chave, valor in dados_contrato.items():
-                                if chave in paragrafo.text:
-                                    paragrafo.text = paragrafo.text.replace(chave, str(valor))
+                        substituir_texto(celula.paragraphs)
 
-            # Guardar o ficheiro final na nova subpasta
+            # Guardar o ficheiro
             caminho_output_doc = os.path.join(caminho_final, nome_ficheiro)
             documento.save(caminho_output_doc)
-            print(f"[*] Sucesso: Ficheiro '{nome_ficheiro}' guardado.")
+            print(f"[*] Sucesso: Ficheiro '{nome_ficheiro}' gerado.")
             
         except Exception as e:
             print(f"[!] Erro ao processar o documento '{nome_ficheiro}': {e}")

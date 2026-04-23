@@ -40,74 +40,71 @@
     <input type="hidden" name="tipo" value="{{ tipo }}">
     <input type="hidden" name="tipo_contrato" value="{{ tipo_contrato }}">
 
-    <!-- SEÇÃO: DADOS GERAIS -->
     <div class="section-title">Dados do Docente e Contratação</div>
     <div class="form-grid">
       <div class="form-group full-width">
         <label>Nome Completo do Docente *</label>
-        <input type="text" name="{{nome_docente}}" required placeholder="Ex: Prof. Dr. Helena Pinto">
+        <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto">
       </div>
       <div class="form-group">
         <label>Data de Início *</label>
-        <input type="date" name="{{data_inicio_contrato}}" required>
+        <input type="date" name="data_inicio_contrato" required>
       </div>
       <div class="form-group">
         <label>Data de Fim *</label>
-        <input type="date" name="{{data_fim_contrato}}" required>
+        <input type="date" name="data_fim_contrato" required>
       </div>
       <div class="form-group">
         <label>Ano Letivo *</label>
-        <input type="text" name="{{ano_letivo}}" required placeholder="Ex: 2025/2026">
+        <input type="text" name="ano_letivo" required placeholder="Ex: 2025/2026">
       </div>
-      <div class="form-group">
-        <label>Ano Anterior *</label>
-        <input type="text" name="{{ano_anterior}}" required placeholder="Ex: 2024/2025">
-      </div>
+    <div class="form-group" id="ano-anterior-group">
+      <label>Ano Anterior *</label>
+      <input type="text" name="ano_anterior" required placeholder="Ex: 2024/2025">
+    </div>
       <div class="form-group">
         <label>Área de Contratação *</label>
-        <input type="text" name="{{area_contratacao}}" required placeholder="Ex: Informática">
+        <input type="text" name="area_contratacao" required placeholder="Ex: Informática">
       </div>
       <div class="form-group">
         <label>Áreas Curriculares *</label>
-        <input type="text" name="{{areas_curriculares}}" required placeholder="Ex: Matemática e Física">
+        <input type="text" name="areas_curriculares" required placeholder="Ex: Matemática e Física">
       </div>
       <div class="form-group full-width">
         <label>Funções Externas</label>
-        <input type="text" name="{{funcoes_externas}}" value="Não exerce funções externas">
+        <input type="text" name="funcoes_externas" value="Não exerce funções externas">
       </div>
     </div>
 
-    <!-- SEÇÃO: JÚRI -->
     <div class="section-title">Membros do Júri</div>
     <div class="form-grid">
-      <div class="form-group"><label>Professor A</label><input type="text" name="{{profAAA}}" required></div>
-      <div class="form-group"><label>Professor B</label><input type="text" name="{{profBBB}}" required></div>
-      <div class="form-group"><label>Professor C</label><input type="text" name="{{profCCC}}" required></div>
-      <div class="form-group"><label>Professor D</label><input type="text" name="{{profDDD}}" required></div>
-      <div class="form-group full-width"><label>Presidente do Júri / Diretor</label><input type="text" name="{{profXXX}}" required></div>
+      <div class="form-group"><label>Professor A</label><input type="text" name="profAAA" required></div>
+      <div class="form-group"><label>Professor B</label><input type="text" name="profBBB" required></div>
+      <div class="form-group"><label>Professor C</label><input type="text" name="profCCC" required></div>
+      <div class="form-group"><label>Professor D</label><input type="text" name="profDDD" required></div>
+      <div class="form-group full-width"><label>Presidente do Júri / Diretor</label><input type="text" name="profXXX" required></div>
     </div>
 
-    <!-- SEÇÃO: UNIDADES CURRICULARES (Oculta se não for renovação) -->
     <div id="section-ucs" class="{% if tipo == 'novoContrato' %}hidden{% endif %}">
-      <div class="section-title">Distribuição de Serviço (UCs)</div>
-      <div class="form-grid">
-        <div class="form-group"><label>UC 1</label><input type="text" name="{{uc_1}}"></div>
-        <div class="form-group"><label>Horas UC 1</label><input type="number" name="{{horas_1}}"></div>
-        <div class="form-group"><label>Curso UC 1</label><input type="text" name="{{curso_1}}"></div>
-        <div class="form-group"><label>Ciclo UC 1</label><input type="text" name="{{ciclo_1}}"></div>
-        
-        <div class="form-group"><label>UC 2</label><input type="text" name="{{uc_2}}"></div>
-        <div class="form-group"><label>Horas UC 2</label><input type="number" name="{{horas_2}}"></div>
-        <div class="form-group"><label>Curso UC 2</label><input type="text" name="{{curso_2}}"></div>
-        <div class="form-group"><label>Ciclo UC 2</label><input type="text" name="{{ciclo_2}}"></div>
+        <div class="section-title">Distribuição de Serviço (UCs)</div>
+        <div class="form-grid">
+            <div class="form-group"><label>UC 1</label><input type="text" name="uc_1"></div>
+            <div class="form-group"><label>Horas UC 1</label><input type="number" name="horas_1"></div>
+            <div class="form-group"><label>Curso UC 1</label><input type="text" name="curso_1"></div>
+            <div class="form-group"><label>Ciclo UC 1</label><input type="text" name="ciclo_1"></div>
+            
+            <div class="form-group"><label>UC 2</label><input type="text" name="uc_2"></div>
+            <div class="form-group"><label>Horas UC 2</label><input type="number" name="horas_2"></div>
+            <div class="form-group"><label>Curso UC 2</label><input type="text" name="curso_2"></div>
+            <div class="form-group"><label>Ciclo UC 2</label><input type="text" name="ciclo_2"></div>
 
-        <div class="form-group full-width"><label>Total de Horas de Contacto</label><input type="number" name="{{total_horas_contacto}}"></div>
-      </div>
+            <div class="form-group full-width"><label>Total de Horas de Contacto</label><input type="number" name="total_horas_contacto"></div>
+        </div>
     </div>
-
+    
     <div class="section-title">Observações</div>
     <div class="form-group">
-      <textarea name="{{relatorio_juri}}" placeholder="Relatório ou notas adicionais..."></textarea>
+      <textarea name="relatorio_juri" placeholder="Relatório ou notas adicionais..."></textarea>
     </div>
 
     <div class="actions">
@@ -118,14 +115,35 @@
 </div>
 
 <script>
+  // Hide "Ano Anterior" field for 'primeira-vez' (TP Edital) - it's a first contract, no previous year
+  document.addEventListener('DOMContentLoaded', function() {
+    const tipo = "{{ tipo }}";
+    const anoAnteriorGroup = document.getElementById('ano-anterior-group');
+    if (tipo === 'primeira-vez') {
+      anoAnteriorGroup.style.display = 'none';
+      // Remove required attribute when hidden
+      const input = anoAnteriorGroup.querySelector('input');
+      if (input) input.required = false;
+    }
+  });
+
   document.getElementById('formContratacao').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('.btn-save');
+    
+    if (!btn) {
+      console.error('Botão não encontrado!');
+      alert('Erro: Botão não encontrado.');
+      return;
+    }
+    
     btn.disabled = true;
     btn.innerText = 'A gerar documentos...';
 
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
+    
+    console.log('Dados a enviar:', data);
 
     try {
       const response = await fetch('/submeter-contratacao', {
@@ -134,18 +152,27 @@
         body: JSON.stringify(data)
       });
 
+      const result = await response.json();
+      console.log('Resposta do servidor:', result);
+      
       if (response.ok) {
         alert('Processo e documentos gerados com sucesso!');
         window.location.href = '/';
       } else {
-        alert('Erro ao gerar processo. Verifique se os templates existem na BD.');
+        console.error('Erro do servidor:', result);
+        alert('Erro: ' + (result.erro || 'Erro desconhecido'));
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Gerar Processo Completo';
+        }
+      }
+    } catch (err) {
+      console.error('Erro de ligação:', err);
+      alert('Erro de ligação ao servidor.');
+      if (btn) {
         btn.disabled = false;
         btn.innerText = 'Gerar Processo Completo';
       }
-    } catch (err) {
-      alert('Erro de ligação ao servidor.');
-      btn.disabled = false;
-      btn.innerText = 'Gerar Processo Completo';
     }
   };
 </script>
