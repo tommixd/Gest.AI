@@ -1,93 +1,71 @@
-import sqlite3
+import mysql.connector
 import os
 from datetime import datetime
 
-# 1. Definir o caminho da BD relativo ao local deste script
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, 'documentos.db') # Cria a BD na mesma pasta do script
+# Coloca aqui os teus dados do MySQL Workbench
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',             # O teu utilizador do MySQL
+    'password': '04072002Tomas!', # A password que usas no Workbench
+    'database': 'BaseDadosGestAI'          # O nome do schema que criaste no Workbench
+}
 
-def criar_tabela():
-    """Cria a base de dados e a tabela se não existirem (e limpa os dados antigos)"""
-    # Garante que a pasta onde a BD vai ficar existe
-    os.makedirs(os.path.dirname(DB_NAME), exist_ok=True)
-    
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('DROP TABLE IF EXISTS documentos')
-    cursor.execute('''
-        CREATE TABLE documentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            caminho TEXT NOT NULL,
-            categoria TEXT NOT NULL,
-            data_upload TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    return conn, cursor
+def obter_ligacao():
+    """Cria e devolve a ligação ao MySQL"""
+    return mysql.connector.connect(**DB_CONFIG)
 
-def popular_bd(conn, cursor):
-    """Percorre as pastas e insere os documentos na bd com filtro de subpastas"""
+def popular_bd():
+    """Percorre as pastas e insere os documentos na BD MySQL"""
     
     pastas_categorias = {
         'pdfs_teste' : 'pdf_llm',
         'Modelos Contratuais/Modelos Gerados': 'gerado',
         'Modelos Contratuais/tempo integral anual': 'tempo integral anual',
-        'Modelos Contratuais/tempo parcial semestral': 'tempo parcial semestral',
-        'Modelos Contratuais/tempo parcial edital': 'tempo parcial edital'
+        'Modelos Contratuais/tempo parcial semestral': 'tempo parcial semestral'
     }
 
-    documentos_inseridos = 0
+    try:
+        conn = obter_ligacao()
+        cursor = conn.cursor()
 
-    # O ROOT_DIR ajuda a calcular os caminhos relativos corretamente
-    ROOT_DIR = os.path.dirname(BASE_DIR)
+        # Limpa os registos antigos para não haver duplicados quando corres o script
+        cursor.execute('TRUNCATE TABLE documentos') 
 
-    for pasta_base, categoria in pastas_categorias.items():
-        # Procuramos as pastas a partir da raiz do projeto (uma pasta acima de 'aplicação')
-        caminho_busca = os.path.join(ROOT_DIR, pasta_base)
-        
-        if not os.path.exists(caminho_busca):
-            print(f"[Aviso] A pasta '{caminho_busca}' não existe. A ignorar...")
-            continue
+        documentos_inseridos = 0
 
-        for root, dirs, files in os.walk(caminho_busca):
-            for file in files:
-                if file.startswith('.') or file.startswith('~$'):
-                    continue 
+        for pasta_base, categoria in pastas_categorias.items():
+            if not os.path.exists(pasta_base):
+                print(f"[Aviso] A pasta '{pasta_base}' não existe. A ignorar...")
+                continue
 
-                caminho_completo = os.path.join(root, file).replace('\\', '/')
-                
-                # --- NOVO FILTRO DE ORGANIZAÇÃO ---
-                # Se for categoria 'gerado', só inserimos se estiver numa subpasta (Caso)
-                # Ex: .../Modelos Gerados/Contrato_Maria/doc.docx -> OK
-                # Ex: .../Modelos Gerados/doc.docx -> IGNORAR
-                rel_path = os.path.relpath(caminho_completo, caminho_busca).replace('\\', '/')
-                partes = rel_path.split('/')
-                
-                if categoria == 'gerado' and len(partes) < 2:
-                    print(f"[-] A ignorar (fora de pasta de contrato): {file}")
-                    continue
+            for root, dirs, files in os.walk(pasta_base):
+                for file in files:
+                    if file.startswith('.') or file.startswith('~$'):
+                        continue 
 
-                # Guardamos o caminho relativo à raiz do projeto para o RAG funcionar
-                caminho_db = os.path.relpath(caminho_completo, ROOT_DIR).replace('\\', '/')
+                    caminho_completo = os.path.join(root, file).replace('\\', '/')
 
-                cursor.execute('''
-                    INSERT INTO documentos (nome, caminho, categoria, data_upload)
-                    VALUES (?, ?, ?, ?)
-                ''', (file, caminho_db, categoria, datetime.now().isoformat()))
+                    # ATENÇÃO: No MySQL usamos %s em vez de ?
+                    query = '''
+                        INSERT INTO documentos (nome, caminho, categoria, data_upload)
+                        VALUES (%s, %s, %s, %s)
+                    '''
+                    valores = (file, caminho_completo, categoria, datetime.now().isoformat())
+                    
+                    cursor.execute(query, valores)
+                    documentos_inseridos += 1
+                    print(f"Inserido: {file} -> Categoria: [{categoria}]")
+            
+        conn.commit()
+        print(f"\n[*] Sucesso! Total de documentos inseridos no MySQL: {documentos_inseridos}")
 
-                documentos_inseridos += 1
-                print(f"[+] Inserido: {file} -> [{categoria}]")
-        
-    conn.commit()
-    print(f"\n[*] Total de documentos inseridos na base de dados: {documentos_inseridos}")
+    except mysql.connector.Error as err:
+        print(f"[!] Erro de ligação ao MySQL: {err}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
 if __name__ == '__main__':
-    print("[*] A limpar e atualizar a base de dados...")
-    try:
-        conexao, cursor_bd = criar_tabela()
-        popular_bd(conexao, cursor_bd)
-        conexao.close()
-        print("[*] Base de dados pronta!")
-    except Exception as e:
-        print(f"[!] Erro durante o setup: {e}")
+    print("[*] A ligar ao MySQL e a atualizar a base de dados...")
+    popular_bd()

@@ -109,7 +109,7 @@ def processar_templates(dados_formulario, tipo_contratacao):
         cursor = ligacao.cursor()
         
         # Procurar templates da categoria correspondente
-        cursor.execute("SELECT nome, caminho FROM documentos WHERE categoria LIKE ?", (f"%{categoria_bd}%",))
+        cursor.execute("SELECT nome, caminho FROM documentos WHERE categoria LIKE %s", (f"%{categoria_bd}%",))
         templates_encontrados = cursor.fetchall()
         ligacao.close()
         
@@ -236,7 +236,7 @@ def iniciar_contratacao(tipo):
 def submeter_contratacao():
     """
     Processa a submissão do formulário, gera os documentos Word 
-    e regista o novo processo na base de dados.
+    e regista CADA ficheiro individualmente na base de dados.
     """
     dados = request.get_json()
     tipo = dados.get('tipo')
@@ -255,36 +255,44 @@ def submeter_contratacao():
         return jsonify({"erro": resultado}), 400
     
     try:
-        # 2. Registar o novo processo na Base de Dados
+        # 2. Registar OS FICHEIROS GERADOS na Base de Dados
         db = get_db()
-        
-        # Limpar o nome para o registo na BD
-        nome_docente_limpo = nome_docente_raw.replace(' ', '_').replace('.', '')
-        
-        # Obter o caminho relativo à raiz do projeto para a BD
         ROOT_DIR = os.path.dirname(BASE_DIR)
-        caminho_relativo = os.path.relpath(caminho_pasta, ROOT_DIR).replace('\\', '/')
         
-        # Inserir o registo do processo (pasta) na BD
-        # Usamos a categoria 'processamento' para que apareça no topo do site
-        db.execute(
-            "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (?, ?, ?, ?)",
-            (f"Processo_{nome_docente_limpo}", caminho_relativo, 'processamento', datetime.now().isoformat())
-        )
+        # Lê todos os ficheiros que acabaram de ser gerados na pasta do docente
+        ficheiros_gerados = os.listdir(caminho_pasta)
+        documentos_inseridos = 0
+        
+        for ficheiro in ficheiros_gerados:
+            caminho_ficheiro_absoluto = os.path.join(caminho_pasta, ficheiro)
+            
+            # Garante que é um ficheiro válido (ignora subpastas ou lixo do sistema)
+            if os.path.isfile(caminho_ficheiro_absoluto):
+                
+                # Obter o caminho relativo do FICHEIRO para a BD
+                caminho_relativo_ficheiro = os.path.relpath(caminho_ficheiro_absoluto, ROOT_DIR).replace('\\', '/')
+                
+                # Inserir o registo de CADA FICHEIRO na BD
+                db.execute(
+                    "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (%s, %s, %s, %s)",
+                    (ficheiro, caminho_relativo_ficheiro, 'processamento', datetime.now().isoformat())
+                )
+                documentos_inseridos += 1
+                
         db.commit()
         
-        print(f"[OK] Processo registado na BD: Processo_{nome_docente_limpo}")
+        print(f"[OK] Processo registado: Foram inseridos {documentos_inseridos} documentos na BD para o(a) {nome_docente_raw}")
         
         return jsonify({
-            "mensagem": "Sucesso: Documentos gerados e processo registado.", 
+            "mensagem": f"Sucesso: {documentos_inseridos} documentos gerados e registados.", 
             "pasta": caminho_pasta,
-            "ficheiros": resultado
+            "ficheiros": ficheiros_gerados
         }), 200
 
     except Exception as e:
         print(f"[!] Erro ao registar na BD: {e}")
         return jsonify({"erro": f"Documentos gerados, mas erro ao registar na BD: {e}"}), 500
-
+    
 @app.route('/chat', methods=['POST'])
 def chat():
     dados = request.json
@@ -300,7 +308,7 @@ def chat():
 @app.route('/ver_documento/<int:doc_id>')
 def ver_documento(doc_id):
     db = get_db()
-    doc = db.execute("SELECT caminho FROM documentos WHERE id = ?", (doc_id,)).fetchone()
+    doc = db.execute("SELECT caminho FROM documentos WHERE id = %s", (doc_id,)).fetchone()
     if doc:
         ROOT_DIR = os.path.dirname(BASE_DIR)
         caminho_abs = os.path.join(ROOT_DIR, doc['caminho'])

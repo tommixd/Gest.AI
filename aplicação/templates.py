@@ -59,7 +59,7 @@ def processar_renovacao(dados_contrato):
         cursor = ligacao.cursor()
         
         # MAGIA AQUI: Em vez de procurar por nomes, procuramos por categoria!
-        query = "SELECT nome, caminho FROM documentos WHERE categoria = ?"
+        query = "SELECT nome, caminho FROM documentos WHERE categoria = %s"
         cursor.execute(query, (categoria_bd,))
         templates_encontrados = cursor.fetchall()
         ligacao.close()
