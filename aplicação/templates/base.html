@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>{% block title %}Gest.AI{% endblock %}</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  
+  <!-- SCRIPT PARA EVITAR "FLASH" BRANCO: Lê a preferência antes de carregar a página -->
+  <script>
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+
+  <style>
+    /* VARIÁVEIS MODO CLARO (Default) */
+    :root { 
+      --primary: #1a73e8; 
+      --primary-hover: #1557b0;
+      --bg: #f5f7fa; 
+      --text: #333333; 
+      --text-muted: #666666;
+      --border: #dddddd; 
+      --panel-bg: #ffffff;
+      --chat-bg: #fafafa;
+      --hover-bg: #f0f0f0;
+      --btn-draft-bg: #e8f0fe;
+      --title-color: #1a1a1a;
+      --shadow: rgba(0,0,0,0.08);
+    }
+    
+    /* VARIÁVEIS MODO ESCURO */
+    [data-theme="dark"] {
+      --primary: #5c9cfa; 
+      --primary-hover: #8abfff;
+      --bg: #121212; 
+      --text: #e0e0e0; 
+      --text-muted: #aaaaaa;
+      --border: #333333; 
+      --panel-bg: #1e1e1e;
+      --chat-bg: #121212;
+      --hover-bg: #2a2a2a;
+      --btn-draft-bg: #1f3a5f;
+      --title-color: #ffffff;
+      --shadow: rgba(0,0,0,0.5);
+    }
+
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; transition: background-color 0.3s, color 0.3s; }
+    
+    .site-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; margin-bottom: 30px; border-bottom: 2px solid var(--border); transition: border-color 0.3s; }
+    .logo-container { text-decoration: none; font-family: 'DM Serif Display', serif; font-size: 2.2rem; color: var(--title-color); margin: 0; transition: color 0.3s; }
+    .logo-container span { color: var(--primary); }
+    .nav-container { display: flex; gap: 15px; align-items: center; }
+    
+    .btn-nav-link { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 1rem; transition: color 0.2s; }
+    .btn-nav-link:hover { color: var(--text); }
+    
+    .btn-rascunhos-global { display: inline-flex; align-items: center; gap: 6px; background-color: var(--btn-draft-bg); color: var(--primary); padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; transition: background 0.2s; }
+    .btn-rascunhos-global:hover { filter: brightness(0.95); }
+    
+    /* Botão Theme Toggle */
+    .btn-theme-toggle { background: none; border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+    .btn-theme-toggle:hover { background: var(--hover-bg); }
+    
+    .icon-sun { display: none; }
+    .icon-moon { display: block; }
+    [data-theme="dark"] .icon-sun { display: block; }
+    [data-theme="dark"] .icon-moon { display: none; }
+
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+      <a href="/" class="logo-container">Gest<span>.AI</span></a>
+      
+      <nav class="nav-container">
+          <!-- Botão Modo Escuro / Claro -->
+          <button id="theme-toggle" class="btn-theme-toggle" title="Alternar Modo Escuro/Claro">
+            <svg class="icon-moon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+            <svg class="icon-sun" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          </button>
+
+          {% block nav_buttons %}
+            <a href="/" class="btn-nav-link">Página Inicial</a>
+            <a href="/meus-rascunhos" class="btn-rascunhos-global">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+              Os Meus Rascunhos
+            </a>
+          {% endblock %}
+      </nav>
+  </header>
+
+  <main>
+      {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // Lógica global para alternar o tema em todas as páginas
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const html = document.documentElement;
+      if (html.getAttribute('data-theme') === 'dark') {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+      }
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

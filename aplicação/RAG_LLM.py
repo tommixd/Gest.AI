@@ -2,7 +2,7 @@ import os
 import torch
 import warnings
 import pdfplumber
-import sqlite3
+import mysql.connector
 import re
 from pathlib import Path
 from collections import defaultdict
@@ -16,30 +16,33 @@ from docx import Document as DocxDocument
 warnings.filterwarnings("ignore")
 dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
 
+# --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',            
+    'password': '04072002Tomas!', 
+    'database': 'BaseDadosGestAI' 
+}
+
 # Variável global para mapear pasta -> lista de chunks (usado na resposta)
 PASTA_TO_CHUNKS = defaultdict(list)
 
-def ler_documentos_via_sqlite():
-    """Liga-se ao SQLite e obtém documentos, extraindo o nome da pasta."""
+def ler_documentos_via_mysql():
+    """Liga-se ao MySQL e obtém documentos, extraindo o nome da pasta."""
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATABASE = os.path.join(BASE_DIR, 'documentos.db')
     ROOT_DIR = os.path.dirname(BASE_DIR)
     
     documentos_langchain = []
     
-    if not os.path.exists(DATABASE):
-        print(f"[!] Erro: Base de dados não encontrada em: {DATABASE}")
-        return []
-
     try:
-        ligacao = sqlite3.connect(DATABASE)
-        ligacao.row_factory = sqlite3.Row
-        cursor = ligacao.cursor()
+        ligacao = mysql.connector.connect(**DB_CONFIG)
+        cursor = ligacao.cursor(dictionary=True)
         cursor.execute("SELECT nome, caminho, categoria FROM documentos")
         registos = cursor.fetchall()
+        cursor.close()
         ligacao.close()
     except Exception as e:
-        print(f"[!] Erro SQLite: {e}")
+        print(f"[!] Erro MySQL: {e}")
         return []
 
     print(f"[*] Encontrados {len(registos)} documentos na BD.")
@@ -49,7 +52,6 @@ def ler_documentos_via_sqlite():
         nome_doc = registo["nome"]
         categoria = registo["categoria"]
         
-        # Constrói caminho absoluto
         caminho_ficheiro = os.path.join(ROOT_DIR, caminho_db).replace('\\', '/')
         if not os.path.exists(caminho_ficheiro):
             caminho_ficheiro = os.path.join(BASE_DIR, caminho_db).replace('\\', '/')
@@ -57,10 +59,8 @@ def ler_documentos_via_sqlite():
                 print(f"[Aviso] '{nome_doc}' não encontrado em: {caminho_ficheiro}")
                 continue
 
-        # Extrai o nome da pasta (diretório pai do ficheiro)
         caminho_obj = Path(caminho_ficheiro)
         nome_pasta = caminho_obj.parent.name
-        print(f"[DEBUG] Processando: {nome_doc} | Pasta: {nome_pasta}")
 
         try:
             if caminho_ficheiro.lower().endswith(".docx"):
@@ -96,11 +96,6 @@ def ler_documentos_via_sqlite():
             print(f"[!] Erro ao processar {nome_doc}: {e}")
 
     print(f"[*] Documentos carregados: {len(documentos_langchain)}")
-    # Mostrar pastas distintas
-    pastas = set(doc.metadata.get('pasta', 'SEM_PASTA') for doc in documentos_langchain)
-    print(f"[*] Pastas encontradas: {', '.join(pastas)}")
-    for doc in documentos_langchain[:5]:
-        print(f"   - {doc.metadata.get('source')} (pasta: {doc.metadata.get('pasta')}) ({len(doc.page_content)} chars)")
     return documentos_langchain
 
 
@@ -109,27 +104,22 @@ def inicializar_rag():
     global PASTA_TO_CHUNKS
     print(f"[*] Motor: {dispositivo.upper()}")
     
-    docs = ler_documentos_via_sqlite()
+    docs = ler_documentos_via_mysql()
     if not docs:
         print("[!] Nenhum documento carregado.")
         return None, None
 
-    print(f"[*] Total documentos: {len(docs)}")
-
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=4000,
+        chunk_size=1500,
         chunk_overlap=800,
         separators=["\n\n", "\n", ".", " ", ""]
     )
     chunks = splitter.split_documents(docs)
-    print(f"[*] Chunks criados: {len(chunks)}")
 
-    # Construir mapeamento pasta -> chunks (para uso na resposta)
     PASTA_TO_CHUNKS.clear()
     for chunk in chunks:
         pasta = chunk.metadata.get('pasta', 'SEM_PASTA')
         PASTA_TO_CHUNKS[pasta].append(chunk)
-    print(f"[*] Mapeamento de pastas: {len(PASTA_TO_CHUNKS)} pastas únicas")
 
     print("[*] A carregar embeddings...")
     embeddings = HuggingFaceEmbeddings(
@@ -155,26 +145,43 @@ def inicializar_rag():
         return_full_text=False
     )
     
-    # Retriever com k alto para ter mais hipóteses
-    retriever = db.as_retriever(search_kwargs={"k": 20, "fetch_k": 40})
+    retriever = db.as_retriever(search_kwargs={"k": 5, "fetch_k": 10})
     return retriever, HuggingFacePipeline(pipeline=pipe)
 
 
 def responder_pergunta(pergunta, retriever, llm):
     global PASTA_TO_CHUNKS
     
-    # Extrair nome da pessoa
+    # 1. Extrair nome da pessoa (AGORA SUPORTA ACENTOS E CARACTERES PORTUGUESES)
     nome_pessoa = None
-    match = re.search(r'(?:da|de|do|d[ae])\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', pergunta, re.IGNORECASE)
+    match = re.search(r'(?:da|de|do|d[ae])\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)', pergunta, re.IGNORECASE)
     if match:
         nome_pessoa = match.group(1).strip()
     if not nome_pessoa:
-        match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})', pergunta)
+        match = re.search(r'([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){1,2})', pergunta)
         if match:
             nome_pessoa = match.group(1).strip()
-    
+            
     print(f"[DEBUG] Nome extraído: {nome_pessoa}")
     
+    # 2. Pesquisar dinamicamente na Base de Dados por Rascunhos
+    info_bd = ""
+    if nome_pessoa:
+        try:
+            db = mysql.connector.connect(**DB_CONFIG)
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM rascunhos WHERE nome_docente LIKE %s", (f"%{nome_pessoa}%",))
+            rascunho = cursor.fetchone()
+            cursor.close()
+            db.close()
+            
+            if rascunho:
+                info_bd = f"O processo de {rascunho['nome_docente']} encontra-se guardado como um RASCUNHO (Incompleto) do tipo '{rascunho['tipo_contrato']}'."
+                print(f"[DEBUG] Rascunho encontrado para: {nome_pessoa}")
+        except Exception as e:
+            print(f"[!] Erro ao consultar BD para rascunhos: {e}")
+
+    # 3. Processar RAG (PDFs/Docs)
     docs_rel = retriever.invoke(pergunta)
     
     pasta_forcada = None
@@ -185,7 +192,6 @@ def responder_pergunta(pergunta, retriever, llm):
                 pasta_forcada = pasta
                 break
         if pasta_forcada:
-            print(f"[DEBUG] Forçando inclusão de {len(PASTA_TO_CHUNKS[pasta_forcada])} chunks da pasta '{pasta_forcada}'")
             chunks_adicionais = PASTA_TO_CHUNKS[pasta_forcada]
             existing = {(d.page_content, d.metadata.get('source')) for d in docs_rel}
             for chunk in chunks_adicionais:
@@ -194,8 +200,8 @@ def responder_pergunta(pergunta, retriever, llm):
                     docs_rel.append(chunk)
                     existing.add(key)
     
-    if not docs_rel:
-        return "Não encontrei documentos relevantes.", ""
+    if not docs_rel and not info_bd:
+        return "Não encontrei documentos ou registos na base de dados sobre isso.", ""
     
     # Ordenar: primeiro os da pasta forçada
     if pasta_forcada:
@@ -203,65 +209,58 @@ def responder_pergunta(pergunta, retriever, llm):
     
     docs_rel = docs_rel[:8]
     
-    # Construir contexto
     contexto_parts = []
-    fontes_unicas = set()
     for i, d in enumerate(docs_rel, 1):
         fonte = d.metadata.get('source', '?')
-        pasta = d.metadata.get('pasta', '?')
-        page = d.metadata.get('page', '')
-        page_info = f" [pág {page}]" if page else ""
-        fontes_unicas.add(fonte)
         conteudo = d.page_content
-        bloco = f"[DOC {i}] PASTA: {pasta} | {fonte}{page_info}\n{conteudo}\n"
-        contexto_parts.append(bloco)
+        contexto_parts.append(f"[Documento: {fonte}]\n{conteudo}\n")
     contexto = "\n".join(contexto_parts)
     
-    # Prompt com ênfase em ignorar outras pastas
+    # 4. Construção Orgânica do Conhecimento
+    conhecimento_sistema = ""
+    if info_bd:
+        conhecimento_sistema += f"Informação atual dos Rascunhos:\n{info_bd}\n\n"
+    if contexto:
+        conhecimento_sistema += f"Informação extraída dos Documentos do processo:\n{contexto}\n\n"
+    if not conhecimento_sistema:
+        conhecimento_sistema = "Não possuis qualquer informação no momento sobre este assunto."
+
     instrucao = ""
     if pasta_forcada:
-        instrucao = f"Ignore completamente qualquer documento que NÃO pertença à pasta '{pasta_forcada}'. Use APENAS os documentos dessa pasta."
-    
-        prompt = f"""<|im_start|>system
-Você é um assistente jurídico. Responda APENAS com uma das duas palavras: "Parcial" ou "Integral".
-Não escreva mais nada, nem frases, nem pontuação, nem fontes. Apenas a palavra.
-Se a informação não estiver nos documentos, responda "Não sei".
+        instrucao = f"Se a pergunta exigir analisar documentos, foca-te na informação da pasta '{pasta_forcada}'."
+
+    # 5. Prompt Dinâmico (Livre de camisa de forças)
+    prompt = f"""<|im_start|>system
+És o Gest.AI, um assistente inteligente de recursos humanos e gestão académica.
+A tua missão é responder à pergunta do utilizador de forma natural, direta e prestável.
+
+Abaixo está a tua base de conhecimento atual sobre este caso. Usa APENAS esta informação para responder. 
+Age como se este conhecimento fosse teu. Não uses frases robóticas como "De acordo com os documentos" ou "A base de dados diz". Assume os factos com naturalidade.
+
+[INÍCIO DO CONHECIMENTO]
+{conhecimento_sistema}
+[FIM DO CONHECIMENTO]
+
+{instrucao}
 <|im_end|>
 <|im_start|>user
-Com base nos documentos abaixo, responda com uma única palavra: o contrato da pessoa mencionada é a tempo parcial ou integral?
-
-DOCUMENTOS:
-{contexto}
-
-PERGUNTA: {pergunta}
+{pergunta}
 <|im_end|>
 <|im_start|>assistant
 """
-    resposta_raw = llm.invoke(prompt)
-    resposta = resposta_raw.replace("<|im_end|>", "").strip()
     
-    # Limpeza: garantir que só fica a palavra esperada
-    if "parcial" in resposta.lower():
-        resposta = "Parcial"
-    elif "integral" in resposta.lower():
-        resposta = "Integral"
-    elif "não sei" in resposta.lower() or "não sei" in resposta.lower():
-        resposta = "Não sei"
-    else:
-        resposta = "Não sei"
+    # 6. Invocar a IA
+    try:
+        resposta_raw = llm.invoke(prompt)
+        resposta = resposta_raw.replace("<|im_end|>", "").strip()
+    except Exception as e:
+        return f"Erro ao gerar resposta da IA: {e}", ""
     
-    # Adicionar a fonte mais relevante (apenas uma, da pasta forçada)
-    if pasta_forcada:
-        # Escolhe o primeiro documento da pasta forçada (ou o que tiver "proposta" ou "necessidade")
+    # Opcional: Adicionar a fonte discretamente no final
+    if pasta_forcada and "rascunho" not in resposta.lower() and "incompleto" not in resposta.lower():
         docs_filtrados = [d for d in docs_rel if d.metadata.get('pasta') == pasta_forcada]
         if docs_filtrados:
             melhor_fonte = docs_filtrados[0].metadata.get('source', '?')
-            # Se houver algum com "Proposta" ou "Necessidade", prefere esse
-            for d in docs_filtrados:
-                nome = d.metadata.get('source', '')
-                if 'proposta' in nome.lower() or 'necessidade' in nome.lower():
-                    melhor_fonte = nome
-                    break
-            resposta += f" (Fonte: {melhor_fonte})"
-    
+            resposta += f"\n\n*(Fonte: {melhor_fonte})*"
+            
     return resposta, contexto

@@ -1,40 +1,74 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Novo Processo - Gest.AI</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    :root { --primary: #1a73e8; --bg: #f5f7fa; --text: #333; --border: #ddd; }
-    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-    .container { max-width: 850px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-    h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin-bottom: 10px; color: #1a1a1a; }
-    .subtitle { color: #666; margin-bottom: 30px; }
-    .section-title { font-size: 1.2rem; font-weight: 600; border-bottom: 2px solid #eee; padding-bottom: 8px; margin: 35px 0 20px; color: var(--primary); }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .full-width { grid-column: span 2; }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.95rem; }
-    input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
-    input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
-    .info-badge { background: #e8f0fe; color: var(--primary); padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px; display: inline-block; }
-    .actions { margin-top: 40px; display: flex; gap: 15px; justify-content: flex-end; }
-    .btn { padding: 12px 28px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; border: none; font-size: 1rem; }
-    .btn-save { background: var(--primary); color: white; }
-    .btn-save:hover { background: #1557b0; }
-    .btn-cancel { background: #eee; color: #666; }
-    .btn-cancel:hover { background: #ddd; }
-    .hidden { display: none; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}Novo Processo - Gest.AI{% endblock %}
+
+{% block extra_css %}
+  .container { max-width: 850px; margin: 0 auto; background: var(--panel-bg); padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px var(--shadow); transition: 0.3s; }
+  h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin-bottom: 10px; color: var(--title-color); }
+  .subtitle { color: var(--text-muted); margin-bottom: 30px; }
+  .section-title { font-size: 1.2rem; font-weight: 600; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin: 35px 0 20px; color: var(--primary); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .full-width { grid-column: span 2; }
+  .form-group { margin-bottom: 15px; }
+  label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.95rem; color: var(--text); }
+  input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; box-sizing: border-box; font-family: inherit; background: var(--bg); color: var(--text); transition: 0.3s; }
+  input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
+  .info-badge { background: var(--btn-draft-bg); color: var(--primary); padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px; display: inline-block; }
+  .actions { margin-top: 40px; display: flex; gap: 15px; justify-content: flex-end; }
+  .btn { padding: 12px 28px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; border: none; font-size: 1rem; }
+  .btn-save { background: var(--primary); color: white; }
+  .btn-save:hover { background: var(--primary-hover); }
+  .btn-draft { background: var(--btn-draft-bg); color: var(--primary); border: 1px solid var(--primary); }
+  .btn-draft:hover { filter: brightness(0.95); }
+  .btn-cancel { background: var(--hover-bg); color: var(--text-muted); }
+  .btn-cancel:hover { background: var(--border); color: var(--text); }
+  .hidden { display: none; }
+{% endblock %}
+
+{% block content %}
 <div class="container">
   <h1>{{ titulo }}</h1>
   <p class="subtitle">Preencha os dados necessários para gerar os documentos do processo.</p>
   
   <div class="info-badge">Regime: {{ regime_nome }}</div>
+
+  <datalist id="lista-professores">
+    {% for prof in professores %}<option value="{{ prof }}">{% endfor %}
+  </datalist>
+
+  <datalist id="lista-areas">
+    {% for area in areas %}<option value="{{ area }}">{% endfor %}
+  </datalist>
+
+  <datalist id="lista-ucs">
+    {% for uc in ucs %}<option value="{{ uc }}">{% endfor %}
+  </datalist>
+
+  <datalist id="lista-cursos">
+    {% for curso in cursos %}<option value="{{ curso }}">{% endfor %}
+  </datalist>
+
+  <datalist id="lista-anos">
+    <option value="2024/2025">
+    <option value="2025/2026">
+    <option value="2026/2027">
+  </datalist>
+  
+  <datalist id="lista-funcoes">
+    <option value="Não exerce funções externas">
+    <option value="Exerce funções externas">
+  </datalist>
+  
+  <datalist id="lista-ciclos">
+    <option value="1º Ciclo (Licenciatura)">
+    <option value="2º Ciclo (Mestrado)">
+    <option value="CTeSP">
+    <option value="Pós-Graduação">
+  </datalist>
+
+  <datalist id="lista-diretor">
+    <option value="Prof. Doutor Miguel Ângelo Sousa Dias Ferreira da Mota">
+  </datalist>
 
   <form id="formContratacao">
     <input type="hidden" name="tipo" value="{{ tipo }}">
@@ -44,106 +78,178 @@
     <div class="form-grid">
       <div class="form-group full-width">
         <label>Nome Completo do Docente *</label>
-        <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto">
+        <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto" value="{{ form_data.get('nome_docente', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Data de Início *</label>
-        <input type="date" name="data_inicio_contrato" required>
+        <input type="date" name="data_inicio_contrato" required value="{{ form_data.get('data_inicio_contrato', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Data de Fim *</label>
-        <input type="date" name="data_fim_contrato" required>
+        <input type="date" name="data_fim_contrato" required value="{{ form_data.get('data_fim_contrato', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Ano Letivo *</label>
-        <input type="text" name="ano_letivo" required placeholder="Ex: 2025/2026">
+        <input type="text" name="ano_letivo" list="lista-anos" autocomplete="off" required placeholder="Ex: 2025/2026" value="{{ form_data.get('ano_letivo', '') if form_data else '' }}">
       </div>
-    <div class="form-group" id="ano-anterior-group">
-      <label>Ano Anterior *</label>
-      <input type="text" name="ano_anterior" required placeholder="Ex: 2024/2025">
-    </div>
+      <div class="form-group" id="ano-anterior-group">
+        <label>Ano Anterior *</label>
+        <input type="text" name="ano_anterior" list="lista-anos" autocomplete="off" required placeholder="Ex: 2024/2025" value="{{ form_data.get('ano_anterior', '') if form_data else '' }}">
+      </div>
       <div class="form-group">
         <label>Área de Contratação *</label>
-        <input type="text" name="area_contratacao" required placeholder="Ex: Informática">
+        <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required placeholder="Ex: Informática" value="{{ form_data.get('area_contratacao', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Áreas Curriculares *</label>
-        <input type="text" name="areas_curriculares" required placeholder="Ex: Matemática e Física">
+        <input type="text" name="areas_curriculares" list="lista-areas" autocomplete="off" required placeholder="Ex: Matemática e Física" value="{{ form_data.get('areas_curriculares', '') if form_data else '' }}">
       </div>
       <div class="form-group full-width">
         <label>Funções Externas</label>
-        <input type="text" name="funcoes_externas" value="Não exerce funções externas">
+        <input type="text" name="funcoes_externas" list="lista-funcoes" autocomplete="off" value="{{ form_data.get('funcoes_externas', 'Não exerce funções externas') if form_data else 'Não exerce funções externas' }}">
       </div>
     </div>
 
     <div class="section-title">Membros do Júri</div>
     <div class="form-grid">
-      <div class="form-group"><label>Professor A</label><input type="text" name="profAAA" required></div>
-      <div class="form-group"><label>Professor B</label><input type="text" name="profBBB" required></div>
-      <div class="form-group"><label>Professor C</label><input type="text" name="profCCC" required></div>
-      <div class="form-group"><label>Professor D</label><input type="text" name="profDDD" required></div>
-      <div class="form-group full-width"><label>Presidente do Júri / Diretor</label><input type="text" name="profXXX" required></div>
+      <div class="form-group">
+        <label>Professor A</label>
+        <input type="text" name="profAAA" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profAAA', '') if form_data else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Professor B</label>
+        <input type="text" name="profBBB" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profBBB', '') if form_data else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Professor C</label>
+        <input type="text" name="profCCC" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profCCC', '') if form_data else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Professor D</label>
+        <input type="text" name="profDDD" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profDDD', '') if form_data else '' }}">
+      </div>
+      
+      <div class="form-group full-width">
+        <label>Presidente do Júri / Diretor</label>
+        <input type="text" name="profXXX" list="lista-diretor" autocomplete="off" required 
+               value="{{ form_data.get('profXXX', 'Prof. Doutor Miguel Ângelo Sousa Dias Ferreira da Mota') }}">
+      </div>
     </div>
 
-    <div id="section-ucs" class="{% if tipo == 'novoContrato' %}hidden{% endif %}">
+    <div id="section-ucs" class="{% if tipo == 'primeira-vez' %}hidden{% endif %}">
         <div class="section-title">Distribuição de Serviço (UCs)</div>
         <div class="form-grid">
-            <div class="form-group"><label>UC 1</label><input type="text" name="uc_1"></div>
-            <div class="form-group"><label>Horas UC 1</label><input type="number" name="horas_1"></div>
-            <div class="form-group"><label>Curso UC 1</label><input type="text" name="curso_1"></div>
-            <div class="form-group"><label>Ciclo UC 1</label><input type="text" name="ciclo_1"></div>
+            <div class="form-group">
+                <label>UC 1</label>
+                <input type="text" name="uc_1" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_1', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Horas UC 1</label>
+                <input type="number" name="horas_1" min="0" step="0.5" value="{{ form_data.get('horas_1', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Curso UC 1</label>
+                <input type="text" name="curso_1" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_1', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Ciclo UC 1</label>
+                <input type="text" name="ciclo_1" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_1', '') if form_data else '' }}">
+            </div>
             
-            <div class="form-group"><label>UC 2</label><input type="text" name="uc_2"></div>
-            <div class="form-group"><label>Horas UC 2</label><input type="number" name="horas_2"></div>
-            <div class="form-group"><label>Curso UC 2</label><input type="text" name="curso_2"></div>
-            <div class="form-group"><label>Ciclo UC 2</label><input type="text" name="ciclo_2"></div>
+            <div class="form-group">
+                <label>UC 2</label>
+                <input type="text" name="uc_2" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_2', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Horas UC 2</label>
+                <input type="number" name="horas_2" min="0" step="0.5" value="{{ form_data.get('horas_2', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Curso UC 2</label>
+                <input type="text" name="curso_2" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_2', '') if form_data else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Ciclo UC 2</label>
+                <input type="text" name="ciclo_2" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_2', '') if form_data else '' }}">
+            </div>
 
-            <div class="form-group full-width"><label>Total de Horas de Contacto</label><input type="number" name="total_horas_contacto"></div>
+            <div class="form-group full-width">
+                <label>Total de Horas de Contacto</label>
+                <input type="number" name="total_horas_contacto" min="0" step="0.5" value="{{ form_data.get('total_horas_contacto', '') if form_data else '' }}">
+            </div>
         </div>
     </div>
     
     <div class="section-title">Observações</div>
     <div class="form-group">
-      <textarea name="relatorio_juri" placeholder="Relatório ou notas adicionais..."></textarea>
+      <textarea name="relatorio_juri" placeholder="Relatório ou notas adicionais...">{{ form_data.get('relatorio_juri', '') if form_data else '' }}</textarea>
     </div>
 
     <div class="actions">
       <button type="button" class="btn btn-cancel" onclick="window.location.href='/'">Cancelar</button>
+      <button type="button" class="btn btn-draft" onclick="guardarRascunho(this)">Guardar Rascunho</button>
       <button type="submit" class="btn btn-save">Gerar Processo Completo</button>
     </div>
   </form>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-  // Hide "Ano Anterior" field for 'primeira-vez' (TP Edital) - it's a first contract, no previous year
   document.addEventListener('DOMContentLoaded', function() {
     const tipo = "{{ tipo }}";
     const anoAnteriorGroup = document.getElementById('ano-anterior-group');
     if (tipo === 'primeira-vez') {
       anoAnteriorGroup.style.display = 'none';
-      // Remove required attribute when hidden
       const input = anoAnteriorGroup.querySelector('input');
       if (input) input.required = false;
     }
   });
 
+  async function guardarRascunho(btn) {
+    const form = document.getElementById('formContratacao');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    if (!data.nome_docente) {
+      alert("Por favor, preencha pelo menos o Nome do Docente antes de guardar o rascunho.");
+      document.querySelector('input[name="nome_docente"]').focus();
+      return;
+    }
+
+    const textoOriginal = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'A guardar...';
+
+    try {
+      const response = await fetch('/guardar-rascunho', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      
+      if (response.ok && result.sucesso) {
+        alert('Rascunho guardado com sucesso!');
+      } else {
+        alert('Erro ao guardar rascunho: ' + (result.erro || 'Erro desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro de ligação ao servidor.');
+    } finally {
+      btn.disabled = false;
+      btn.innerText = textoOriginal;
+    }
+  }
+
   document.getElementById('formContratacao').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('.btn-save');
-    
-    if (!btn) {
-      console.error('Botão não encontrado!');
-      alert('Erro: Botão não encontrado.');
-      return;
-    }
-    
     btn.disabled = true;
     btn.innerText = 'A gerar documentos...';
 
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
-    
-    console.log('Dados a enviar:', data);
 
     try {
       const response = await fetch('/submeter-contratacao', {
@@ -153,29 +259,19 @@
       });
 
       const result = await response.json();
-      console.log('Resposta do servidor:', result);
-      
       if (response.ok) {
         alert('Processo e documentos gerados com sucesso!');
         window.location.href = '/';
       } else {
-        console.error('Erro do servidor:', result);
         alert('Erro: ' + (result.erro || 'Erro desconhecido'));
-        if (btn) {
-          btn.disabled = false;
-          btn.innerText = 'Gerar Processo Completo';
-        }
-      }
-    } catch (err) {
-      console.error('Erro de ligação:', err);
-      alert('Erro de ligação ao servidor.');
-      if (btn) {
         btn.disabled = false;
         btn.innerText = 'Gerar Processo Completo';
       }
+    } catch (err) {
+      alert('Erro de ligação ao servidor.');
+      btn.disabled = false;
+      btn.innerText = 'Gerar Processo Completo';
     }
   };
 </script>
-
-</body>
-</html>
+{% endblock %}

@@ -1,12 +1,14 @@
 import os
 import sys
-import sqlite3
 import threading
 import re
 import docx
+import json
+import mysql.connector # <-- SUBSTITUI O SQLITE3
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, g, request, send_file, jsonify
+from werkzeug.utils import secure_filename
 
 # --- GARANTIR IMPORTAÇÃO CORRETA DO RAG_LLM ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -25,18 +27,24 @@ except Exception as e:
     def inicializar_rag(): return None, None
 
 try:
-    # Importamos a função diretamente do teu ficheiro templates.py
     from templates import processar_renovacao
     print("[OK] Motor de templates importado com sucesso.")
 except ImportError:
     print("[!] Aviso: Não foi possível importar templates.py. A usar lógica interna.")
-    # Fallback caso o ficheiro não exista
     def processar_renovacao(dados): return None
+
 # Inicializa a aplicação
 app = Flask(__name__)
 app.config["SITE_NAME"] = "Gest.AI"  
 
-DATABASE = os.path.join(BASE_DIR, 'documentos.db')
+# --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',            
+    'password': '04072002Tomas!', 
+    'database': 'BaseDadosGestAI' 
+}
+
 PASTA_UPLOADS = 'PastaUploadsSiteTest'
 
 # --- CONFIGURAÇÃO DA IA EM BACKGROUND ---
@@ -65,7 +73,7 @@ thread_ia.start()
 CATEGORIA_POR_TIPO = {
     "renovacao-integral": "tempo integral anual",
     "renovacao-parcial": "tempo parcial semestral",
-    "primeira-vez": "tempo parcial edital"  # Corrigido para Edital
+    "primeira-vez": "tempo parcial edital"
 }
 
 def criar_nome_pasta_limpo(nome_completo):
@@ -76,10 +84,6 @@ def criar_nome_pasta_limpo(nome_completo):
     return f"Contrato_{nome_limpo}"
 
 def processar_templates(dados_formulario, tipo_contratacao):
-    """
-    Processa os templates Word conforme o tipo de contratação.
-    Inclui logs detalhados para diagnóstico de erros.
-    """
     categoria_bd = CATEGORIA_POR_TIPO.get(tipo_contratacao)
     if not categoria_bd:
         print(f"[!] Erro: Tipo de contratação '{tipo_contratacao}' não mapeado.")
@@ -88,7 +92,6 @@ def processar_templates(dados_formulario, tipo_contratacao):
     nome_docente = dados_formulario.get("nome_docente", "Docente_Desconhecido")
     nome_subpasta = criar_nome_pasta_limpo(nome_docente)
     
-    # Resolver caminhos absolutos
     ROOT_DIR = os.path.dirname(BASE_DIR)
     caminho_final = os.path.join(ROOT_DIR, 'Modelos Contratuais', 'Em_Processamento', nome_subpasta)
     
@@ -102,15 +105,14 @@ def processar_templates(dados_formulario, tipo_contratacao):
 
     templates_encontrados = []
     try:
-        # IMPORTANTE: Garantir que usamos o caminho absoluto da BD
-        print(f"[*] A ligar à BD em: {os.path.abspath(DATABASE)}")
-        ligacao = sqlite3.connect(DATABASE)
-        ligacao.row_factory = sqlite3.Row
-        cursor = ligacao.cursor()
+        # Ligar ao MySQL
+        ligacao = mysql.connector.connect(**DB_CONFIG)
+        cursor = ligacao.cursor(dictionary=True)
         
-        # Procurar templates da categoria correspondente
         cursor.execute("SELECT nome, caminho FROM documentos WHERE categoria LIKE %s", (f"%{categoria_bd}%",))
         templates_encontrados = cursor.fetchall()
+        
+        cursor.close()
         ligacao.close()
         
         print(f"[*] Templates encontrados na BD: {len(templates_encontrados)}")
@@ -125,7 +127,6 @@ def processar_templates(dados_formulario, tipo_contratacao):
     ficheiros_gerados = []
     for template in templates_encontrados:
         nome_ficheiro = template["nome"]
-        # Resolver o caminho do template a partir da raiz do projeto
         caminho_abs_template = os.path.join(ROOT_DIR, template["caminho"])
         
         if not os.path.exists(caminho_abs_template):
@@ -136,14 +137,11 @@ def processar_templates(dados_formulario, tipo_contratacao):
             print(f"[*] A preencher: {nome_ficheiro}...")
             documento = docx.Document(caminho_abs_template)
 
-            # Substituição robusta (Parágrafos)
             for paragrafo in documento.paragraphs:
                 for chave, valor in dados_formulario.items():
                     if chave in paragrafo.text and valor:
-                        # Substituímos no texto completo do parágrafo para manter a integridade das tags
                         paragrafo.text = paragrafo.text.replace(chave, str(valor))
 
-            # Substituição robusta (Tabelas)
             for tabela in documento.tables:
                 for linha in tabela.rows:
                     for celula in linha.cells:
@@ -165,24 +163,26 @@ def processar_templates(dados_formulario, tipo_contratacao):
 
     return caminho_final, ficheiros_gerados
 
-# --- ROTAS FLASK ---
+# --- ROTAS FLASK E BASE DE DADOS ---
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row 
+        db = g._database = mysql.connector.connect(**DB_CONFIG)
     return db
 
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
-    if db is not None: db.close()
+    if db is not None:
+        db.close()
 
 @app.route('/')  
 def index():
     db = get_db()
-    cursor = db.execute("SELECT * FROM documentos ORDER BY categoria, nome")
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM documentos ORDER BY categoria, nome")
     lista_documentos = cursor.fetchall()
+    cursor.close()
     
     documentos_agrupados = {'processamento': {}, 'gerado': {}, 'template': {}, 'pdf_llm': {}}
     ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -207,14 +207,12 @@ def index():
 
 @app.route('/contratacao/<tipo>')
 def iniciar_contratacao(tipo):
-    # Dicionário para os títulos das páginas
     titulos = {
         'renovacao-integral': 'Renovação de Contrato (Integral)',
         'renovacao-parcial': 'Renovação de Contrato (Parcial)',
         'primeira-vez': 'Primeira Contratação (Edital)'
     }
     
-    # Dicionário para o regime (box azul)
     regimes = {
         'renovacao-integral': 'Tempo Integral',
         'renovacao-parcial': 'Tempo Parcial',
@@ -224,62 +222,103 @@ def iniciar_contratacao(tipo):
     titulo = titulos.get(tipo, 'Novo Processo')
     regime_nome = regimes.get(tipo, 'Padrão')
     
-    # Importante: passar o 'tipo' para o formulário saber o que submeter
+    # -----------------------------------------------------------------
+    # LÓGICA DO RASCUNHO: Verifica se fomos chamados por um rascunho_id
+    # -----------------------------------------------------------------
+    rascunho_id = request.args.get('rascunho_id')
+    dados_preenchidos = {}
+
+    lista_professores = []
+    lista_areas = []
+    lista_ucs = []
+    lista_cursos = []
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        
+        # Carregar Rascunho
+        if rascunho_id:
+            cursor.execute("SELECT dados_formulario FROM rascunhos WHERE id = %s", (rascunho_id,))
+            resultado = cursor.fetchone()
+            if resultado:
+                dados_preenchidos = json.loads(resultado['dados_formulario'])
+        
+        # --- NOVA PARTE: Buscar dados dinâmicos ao MySQL ---
+        # Usamos try/except individuais para não quebrar a página se uma tabela falhar
+        try:
+            cursor.execute("SELECT nome FROM docentes WHERE tipo_docente = 'carreira' ORDER BY nome")
+            lista_professores = [row['nome'] for row in cursor.fetchall()]
+        except Exception: pass
+
+        try:
+            cursor.execute("SELECT nome FROM areas_estudo ORDER BY nome")
+            lista_areas = [row['nome'] for row in cursor.fetchall()]
+        except Exception: pass
+
+        try:
+            cursor.execute("SELECT nome FROM ucs ORDER BY nome")
+            lista_ucs = [row['nome'] for row in cursor.fetchall()]
+        except Exception: pass
+
+        try:
+            cursor.execute("SELECT nome FROM cursos ORDER BY nome")
+            lista_cursos = [row['nome'] for row in cursor.fetchall()]
+        except Exception: pass
+        
+        cursor.close()
+    except Exception as e:
+        print(f"[!] Erro ao carregar dados para o formulário: {e}")
+
+    # Passamos as listas para o HTML usar!
     return render_template('contratacao.html', 
                            titulo=titulo, 
                            regime_nome=regime_nome, 
                            tipo=tipo,
-                           tipo_contrato=tipo)
+                           tipo_contrato=tipo,
+                           form_data=dados_preenchidos,
+                           professores=lista_professores,
+                           areas=lista_areas,
+                           ucs=lista_ucs,
+                           cursos=lista_cursos)
 
 
 @app.route('/submeter-contratacao', methods=['POST'])
 def submeter_contratacao():
-    """
-    Processa a submissão do formulário, gera os documentos Word 
-    e regista CADA ficheiro individualmente na base de dados.
-    """
     dados = request.get_json()
     tipo = dados.get('tipo')
     
-    # Validação: o nome do docente é obrigatório para criar a pasta e registar na BD
     nome_docente_raw = dados.get('nome_docente')
     if not nome_docente_raw or not tipo:
         return jsonify({"erro": "Dados incompletos: O nome do docente é obrigatório."}), 400
     
-    # 1. Chamar a geração de templates Word
-    # Esta função preenche os DOCX e guarda-os na pasta 'Em_Processamento'
     caminho_pasta, resultado = processar_templates(dados, tipo)
     
     if caminho_pasta is None:
-        # Se a função retornar None, significa que não encontrou templates ou houve erro
         return jsonify({"erro": resultado}), 400
     
     try:
-        # 2. Registar OS FICHEIROS GERADOS na Base de Dados
         db = get_db()
+        cursor = db.cursor() # Usar cursor no MySQL
         ROOT_DIR = os.path.dirname(BASE_DIR)
         
-        # Lê todos os ficheiros que acabaram de ser gerados na pasta do docente
         ficheiros_gerados = os.listdir(caminho_pasta)
         documentos_inseridos = 0
         
         for ficheiro in ficheiros_gerados:
             caminho_ficheiro_absoluto = os.path.join(caminho_pasta, ficheiro)
             
-            # Garante que é um ficheiro válido (ignora subpastas ou lixo do sistema)
             if os.path.isfile(caminho_ficheiro_absoluto):
-                
-                # Obter o caminho relativo do FICHEIRO para a BD
                 caminho_relativo_ficheiro = os.path.relpath(caminho_ficheiro_absoluto, ROOT_DIR).replace('\\', '/')
                 
-                # Inserir o registo de CADA FICHEIRO na BD
-                db.execute(
+                cursor.execute(
                     "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (%s, %s, %s, %s)",
                     (ficheiro, caminho_relativo_ficheiro, 'processamento', datetime.now().isoformat())
                 )
                 documentos_inseridos += 1
                 
         db.commit()
+        cursor.close()
         
         print(f"[OK] Processo registado: Foram inseridos {documentos_inseridos} documentos na BD para o(a) {nome_docente_raw}")
         
@@ -293,6 +332,100 @@ def submeter_contratacao():
         print(f"[!] Erro ao registar na BD: {e}")
         return jsonify({"erro": f"Documentos gerados, mas erro ao registar na BD: {e}"}), 500
     
+
+@app.route('/guardar-rascunho', methods=['POST'])
+def rota_guardar_rascunho():
+    dados = request.get_json()
+    
+    nome = dados.get('nome_docente', 'Sem Nome')
+    tipo = dados.get('tipo', 'indefinido')
+    
+    dados_texto = json.dumps(dados)
+    data_atual = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        
+        query = """
+            INSERT INTO rascunhos (nome_docente, tipo_contrato, dados_formulario, data_guardado) 
+            VALUES (%s, %s, %s, %s)
+        """
+        cursor.execute(query, (nome, tipo, dados_texto, data_atual))
+        db.commit()
+        
+        return jsonify({"sucesso": True})
+        
+    except Exception as e:
+        print(f"[!] Erro ao guardar rascunho: {e}")
+        return jsonify({"sucesso": False, "erro": str(e)})
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        # Removi o db.close() daqui para não fechar a ligação prematuramente. O @app.teardown_appcontext trata disso.
+
+@app.route('/meus-rascunhos')
+def ver_rascunhos():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM rascunhos ORDER BY id DESC")
+    lista_rascunhos = cursor.fetchall()
+    cursor.close()
+    
+    return render_template('pasta_rascunhos.html', rascunhos=lista_rascunhos)
+
+@app.route('/upload-documento', methods=['POST'])
+def upload_documento():
+    # Verifica se a requisição contém ficheiros
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum ficheiro foi enviado."}), 400
+
+    ficheiros = request.files.getlist('file')
+    if not ficheiros or ficheiros[0].filename == '':
+        return jsonify({"erro": "Nenhum ficheiro selecionado."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        
+        ROOT_DIR = os.path.dirname(BASE_DIR)
+        caminho_uploads = os.path.join(ROOT_DIR, PASTA_UPLOADS)
+        
+        # Garantir que a pasta existe
+        if not os.path.exists(caminho_uploads):
+            os.makedirs(caminho_uploads)
+
+        documentos_inseridos = 0
+        
+        for ficheiro in ficheiros:
+            if ficheiro.filename:
+                # Limpar o nome do ficheiro para evitar problemas no sistema operativo
+                nome_seguro = secure_filename(ficheiro.filename)
+                caminho_absoluto = os.path.join(caminho_uploads, nome_seguro)
+                
+                # Guardar fisicamente no disco
+                ficheiro.save(caminho_absoluto)
+                
+                # Caminho relativo para gravar na BD
+                caminho_relativo = os.path.join(PASTA_UPLOADS, nome_seguro).replace('\\', '/')
+                
+                # Inserir na base de dados (categoria pdf_llm conforme os teus dados)
+                cursor.execute(
+                    "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (%s, %s, %s, %s)",
+                    (nome_seguro, caminho_relativo, 'pdf_llm', datetime.now().isoformat())
+                )
+                documentos_inseridos += 1
+                
+        db.commit()
+        cursor.close()
+        
+        print(f"[OK] Upload concluído: {documentos_inseridos} ficheiros recebidos.")
+        return jsonify({"mensagem": f"{documentos_inseridos} ficheiros guardados com sucesso!"}), 200
+
+    except Exception as e:
+        print(f"[!] Erro no upload: {e}")
+        return jsonify({"erro": f"Erro interno ao processar o upload: {e}"}), 500
+
 @app.route('/chat', methods=['POST'])
 def chat():
     dados = request.json
@@ -308,11 +441,16 @@ def chat():
 @app.route('/ver_documento/<int:doc_id>')
 def ver_documento(doc_id):
     db = get_db()
-    doc = db.execute("SELECT caminho FROM documentos WHERE id = %s", (doc_id,)).fetchone()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT caminho FROM documentos WHERE id = %s", (doc_id,))
+    doc = cursor.fetchone()
+    cursor.close()
+    
     if doc:
         ROOT_DIR = os.path.dirname(BASE_DIR)
         caminho_abs = os.path.join(ROOT_DIR, doc['caminho'])
-        if os.path.exists(caminho_abs): return send_file(caminho_abs)
+        if os.path.exists(caminho_abs): 
+            return send_file(caminho_abs)
     return "Não encontrado", 404
 
 if __name__ == '__main__':

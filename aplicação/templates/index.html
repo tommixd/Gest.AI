@@ -1,294 +1,253 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gest.AI</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-</head>
-<body>
+{% extends "base.html" %}
 
-  <header>
-    <div class="logo">Gest<span>.AI</span></div>
-    <nav style="display: flex; gap: 10px; align-items: center;">
-      <button class="nav-btn active" data-panel="chat">Assistente</button>
-      <button class="nav-btn" data-panel="upload">Documentos</button>
-      <!-- Botão de Novo Processo no Topo -->
-      <button class="nav-btn" id="btn-novo-processo" style="background: #1a73e8; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#1557b0'" onmouseout="this.style.background='#1a73e8'">
-        + Novo Processo
-      </button>
-    </nav>
-  </header>
+{% block title %}Página Inicial - Gest.AI{% endblock %}
 
-  <main>
-    <div class="panel active" id="panel-chat">
-      <div class="panel-header">
-        <h1 class="panel-title">Assistente</h1>
+{% block extra_css %}
+  .panel { display: none; animation: fadeIn 0.3s ease-in-out; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  .nav-btn { background: none; border: none; font-size: 1rem; cursor: pointer; font-weight: 500; color: var(--text-muted); padding: 8px 12px; border-radius: 6px; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .nav-btn:hover { color: var(--text); background: var(--hover-bg); }
+  .nav-btn.active { color: var(--primary); background: var(--btn-draft-bg); font-weight: 600; }
+
+  .chat-container { display: flex; flex-direction: column; height: 65vh; background: var(--panel-bg); border-radius: 12px; box-shadow: 0 4px 20px var(--shadow); overflow: hidden; border: 1px solid var(--border); margin-top: 20px; transition: 0.3s; }
+  .chat-box { flex: 1; padding: 20px; overflow-y: auto; background: var(--chat-bg); display: flex; flex-direction: column; gap: 15px; transition: 0.3s; }
+  .chat-input-area { padding: 15px 20px; background: var(--panel-bg); border-top: 1px solid var(--border); display: flex; gap: 10px; transition: 0.3s; }
+  .chat-input-area input { flex: 1; padding: 12px 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); }
+  .chat-input-area input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
+  .btn-enviar { background: var(--primary); color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif;}
+  .btn-enviar:hover { background: var(--primary-hover); }
+  .msg { max-width: 80%; padding: 12px 16px; border-radius: 8px; font-size: 0.95rem; line-height: 1.4; }
+  .msg-ai { background: var(--panel-bg); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 2px; color: var(--text); }
+  .msg-user { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+
+  .upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 50px 20px; text-align: center; background: var(--panel-bg); margin: 20px 0; transition: 0.2s; cursor: pointer; }
+  .upload-area:hover { border-color: var(--primary); background: var(--hover-bg); }
+  .upload-area svg { width: 60px; height: 60px; color: var(--text-muted); margin-bottom: 15px; transition: 0.2s; }
+  .upload-area:hover svg { color: var(--primary); }
+  
+  .database-section { background: var(--panel-bg); border-radius: 12px; padding: 30px; box-shadow: 0 4px 20px var(--shadow); border: 1px solid var(--border); margin-top: 30px; transition: 0.3s; }
+  .database-title { font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-top: 0; margin-bottom: 20px; color: var(--title-color); }
+  .doc-category h3 { color: var(--primary); font-size: 1.1rem; border-bottom: 2px solid var(--border); padding-bottom: 5px; margin-top: 30px; }
+  
+  /* --- ESTILOS NOVOS PARA AS PASTAS RETRÁTEIS --- */
+  .folder-header { cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-radius: 8px; background: transparent; transition: background 0.2s; user-select: none; font-weight: 600; color: var(--text); }
+  .folder-header:hover { background: var(--hover-bg); }
+  .folder-arrow { font-size: 0.75rem; color: var(--text-muted); transition: transform 0.3s; }
+  .folder-content { margin-left: 25px; padding-left: 10px; border-left: 2px solid var(--border); margin-top: 5px; margin-bottom: 15px; }
+  
+  .doc-item { padding: 8px 10px; border-radius: 6px; display: flex; align-items: center; gap: 10px; transition: background 0.2s; }
+  .doc-item:hover { background: var(--hover-bg); }
+  .doc-item a { color: var(--text); text-decoration: none; font-weight: 500; transition: color 0.2s; }
+  .doc-item a:hover { color: var(--primary); }
+
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(3px); }
+  .modal.active { display: flex; }
+  .modal-content { background: var(--panel-bg); padding: 35px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px var(--shadow); color: var(--text); }
+  .modal-content h2 { font-family: 'DM Serif Display', serif; margin-top: 0; font-size: 1.8rem; color: var(--title-color); }
+  .btn-modal { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-bg); color: var(--text); text-align: left; font-size: 1.05rem; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-modal:hover { border-color: var(--primary); background: var(--btn-draft-bg); color: var(--primary); transform: translateY(-2px); }
+  .btn-fechar { background: none; border: none; color: var(--text-muted); font-size: 0.9rem; text-decoration: underline; cursor: pointer; display: block; text-align: center; width: 100%; margin-top: 15px; font-family: 'Outfit', sans-serif; }
+{% endblock %}
+
+{% block nav_buttons %}
+  <button class="nav-btn active" data-panel="chat">Assistente</button>
+  <button class="nav-btn" data-panel="upload">Documentos</button>
+  <a href="/meus-rascunhos" class="btn-rascunhos-global">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+    Rascunhos
+  </a>
+  <button id="btn-novo-processo" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-family: 'Outfit', sans-serif; transition: 0.2s;">
+    + Novo Processo
+  </button>
+{% endblock %}
+
+{% block content %}
+  <!-- PAINEL 1: ASSISTENTE (CHAT) -->
+  <div id="chat" class="panel active">
+    <div class="chat-container">
+      <div class="chat-box" id="chat-box">
+        <div class="msg msg-ai">Olá! Como posso ajudar hoje?</div>
       </div>
-
-      <div class="chat-window" id="chat-window">
-        <div class="msg bot">
-          <div class="msg-avatar">AI</div>
-          <div class="msg-bubble">Olá! Como posso ajudar?</div>
-        </div>
-      </div>
-
       <div class="chat-input-area">
-        <textarea id="chat-input" rows="1" placeholder="Escreve uma mensagem…"></textarea>
-        <button class="send-btn" id="send-btn" title="Enviar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="panel" id="panel-upload">
-      <div class="panel-header">
-        <h1 class="panel-title">Documentos</h1>
-      </div>
-
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.csv,.xlsx" />
-        <div class="upload-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-          </svg>
-        </div>
-        <p class="upload-title">Arrasta ficheiros ou clica para escolher</p>
-      </div>
-
-      <div class="file-list" id="file-list">
-        <div class="empty-state" id="empty-state">
-          <p>Ainda não há ficheiros carregados.</p>
-        </div>
-      </div>
-
-      <button class="process-btn" id="process-btn" disabled>Processar documentos</button>
-
-<style>
-  /* Estilos para o Dropdown */
-  .collapsible-header { cursor: pointer; user-select: none; transition: background 0.2s; }
-  .collapsible-header:hover { background-color: #f0f4f8 !important; }
-  .chevron-icon { transition: transform 0.3s; }
-  .collapsed .chevron-icon { transform: rotate(-90deg); }
-  .collapsed + .collapsible-content { display: none; }
-</style>
-
-        <div class="db-section" style="margin-top: 50px; border-top: 1px solid #eaeaea; padding-top: 30px;">
-          <h2 class="panel-title" style="font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 25px;">Base de Dados</h2>
-          
-          {% set titulos_categorias = {
-              'processamento': 'Contratos em Processamento',
-              'gerado': 'Contratos Gerados',
-              'template': 'Templates Base',
-              'pdf_llm': 'Documentos para Análise (IA)'
-          } %}
-
-          {% if documentos_agrupados %}
-              {% for categoria, casos in documentos_agrupados.items() %}
-                  <!-- Título da Categoria (Clicável) -->
-                  <div class="collapsible-header" onclick="this.classList.toggle('collapsed')" style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #1a1a1a; margin-top: 30px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 8px; background: #f8f9fa; font-weight: 600;">
-                      <span style="display: flex; align-items: center; gap: 10px;">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                          {{ titulos_categorias.get(categoria, categoria | capitalize) }}
-                      </span>
-                      <svg class="chevron-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                  </div>
-                  
-                  <div class="collapsible-content">
-                      {% for caso, docs in casos.items() %}
-                          <div class="grupo-caso" style="margin-bottom: 15px; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden; margin-left: 15px;">
-                              <!-- Cabeçalho do Caso (Clicável) -->
-                              <div class="collapsible-header" onclick="this.classList.toggle('collapsed')" style="background: #ffffff; padding: 12px 15px; border-bottom: 1px solid #eaeaea; display: flex; justify-content: space-between; align-items: center;">
-                                  <span style="font-family: 'Outfit', sans-serif; font-weight: 500; color: #444; display: flex; align-items: center; gap: 8px;">
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                      {{ caso }}
-                                  </span>
-                                  <div style="display: flex; align-items: center; gap: 10px;">
-                                      <span style="font-size: 0.75rem; background: #f0f0f0; padding: 2px 8px; border-radius: 12px; color: #777;">{{ docs|length }} ficheiro(s)</span>
-                                      <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                  </div>
-                              </div>
-                              
-                              <div class="collapsible-content">
-                                  <table style="width: 100%; border-collapse: collapse; font-family: 'Outfit', sans-serif; font-size: 0.9rem;">
-                                      <tbody style="background: white;">
-                                          {% for doc in docs %}
-                                          <tr style="border-bottom: 1px solid #f9f9f9;">
-                                              <td style="padding: 10px 15px;">
-                                                  <a href="/ver_documento/{{ doc.id }}" target="_blank" style="color: #1a73e8; text-decoration: none; display: flex; align-items: center; gap: 8px;">
-                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                                                      {{ doc.nome }}
-                                                  </a>
-                                              </td>
-                                              <td style="padding: 10px 15px; font-size: 0.75rem; color: #aaa; text-align: right;">{{ doc.caminho }}</td>
-                                          </tr>
-                                          {% endfor %}
-                                      </tbody>
-                                  </table>
-                              </div>
-                          </div>
-                      {% endfor %}
-                  </div>
-              {% endfor %}
-          {% endif %}
-        </div>
-    </div>
-  </main>
-
-  <!-- Modal de Seleção de Processo -->
-  <div id="modal-processo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-    <!-- Dentro do modal-processo no index.html -->
-    <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
-      <a href="/contratacao/renovacao-integral" class="process-link">...</a>
-      <a href="/contratacao/renovacao-parcial" class="process-link">...</a>
-      <a href="/contratacao/primeira-vez" class="process-link">...</a>
-    </div>
-
-    <div style="background: white; padding: 30px; border-radius: 16px; max-width: 450px; width: 90%; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
-      <button id="fechar-modal" style="position: absolute; top: 15px; right: 15px; border: none; background: none; font-size: 1.8rem; cursor: pointer; color: #888;">&times;</button>
-      
-      <h2 style="font-family: 'DM Serif Display', serif; color: #1a1a1a; margin-bottom: 10px; font-size: 1.8rem;">Novo Processo</h2>
-      <p style="color: #666; margin-bottom: 25px; font-family: 'Outfit', sans-serif;">Selecione o tipo de contratação que deseja iniciar:</p>
-      
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <a href="/contratacao/renovacao-integral" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
-          <span style="font-size: 1.5rem;"></span>
-          <div>
-            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Renovação: Tempo Integral</div>
-            <div style="font-size: 0.8rem; color: #888;">Regime de tempo integral</div>
-          </div>
-        </a>
-        <a href="/contratacao/renovacao-parcial" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
-          <span style="font-size: 1.5rem;"></span>
-          <div>
-            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Renovação: Tempo Parcial</div>
-            <div style="font-size: 0.8rem; color: #888;">Regime de tempo parcial</div>
-          </div>
-        </a>
-        <a href="/contratacao/primeira-vez" style="text-decoration: none; color: #333; padding: 18px; border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; display: flex; align-items: center; gap: 15px;" onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#1a73e8'; this.style.transform='translateX(5px)'" onmouseout="this.style.background='white'; this.style.borderColor='#eee'; this.style.transform='none'">
-          <span style="font-size: 1.5rem;"></span>
-          <div>
-            <div style="font-weight: 600; font-family: 'Outfit', sans-serif;">Primeira Contratação</div>
-            <div style="font-size: 0.8rem; color: #888;">Novo colaborador (Tempo Parcial)</div>
-          </div>
-        </a>
+        <input type="text" id="user-input" placeholder="Ex: O contrato do João Silva é parcial ou integral?" autocomplete="off" onkeypress="handleKeyPress(event)">
+        <button class="btn-enviar" onclick="enviarMensagem()">Enviar</button>
       </div>
     </div>
   </div>
 
-  <div id="toast"></div>
+  <!-- PAINEL 2: DOCUMENTOS E BASE DE DADOS -->
+  <div id="upload" class="panel">
+    <div class="upload-area" onclick="document.getElementById('file-input').click()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+      <h3 style="margin: 0; color: var(--text);">Arraste ficheiros ou clique para escolher</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Apenas para análise temporária da IA</p>
+      <input type="file" id="file-input" style="display: none;" multiple>
+    </div>
 
-  <script>
-  // --- FUNÇÕES DE NAVEGAÇÃO ---
-  const navBtns = document.querySelectorAll('.nav-btn');
-  const panels  = document.querySelectorAll('.panel');
+    <!-- Secção da Base de Dados -->
+    <div class="database-section">
+      <h2 class="database-title">Base de Dados (Arquivo)</h2>
+      {% if documentos_agrupados %}
+        {% for categoria, casos in documentos_agrupados.items() %}
+          <div class="doc-category">
+            <h3 style="text-transform: capitalize;">{{ categoria.replace('_', ' ') }}</h3>
+            
+            {% for caso, docs in casos.items() %}
+              <div style="margin-top: 15px;">
+                <!-- Cabeçalho da Pasta Clicável -->
+                <div class="folder-header" onclick="toggleFolder(this)">
+                  <span class="folder-arrow">▼</span>
+                  <span>📁 {{ caso }}</span>
+                </div>
+                
+                <!-- Conteúdo da Pasta (Ficheiros) -->
+                <div class="folder-content" style="display: block;">
+                  {% for doc in docs %}
+                    <div class="doc-item">
+                      📄 <a href="/ver_documento/{{ doc.id }}" target="_blank">{{ doc.nome }}</a>
+                      <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 5px;">({{ doc.data_upload[:10] }})</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+            
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color: var(--text-muted);">A base de dados encontra-se vazia.</p>
+      {% endif %}
+    </div>
+  </div>
 
-  navBtns.forEach(btn => {
-    if (btn.id !== 'btn-novo-processo') {
-      btn.addEventListener('click', () => {
-        navBtns.forEach(b => b.classList.remove('active'));
-        panels.forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        const target = document.getElementById('panel-' + btn.dataset.panel);
-        if(target) target.classList.add('active');
-      });
-    }
+  <!-- MODAL: NOVO PROCESSO -->
+  <div id="modal-processo" class="modal">
+    <div class="modal-content">
+      <h2>Escolher Tipo de Contrato</h2>
+      <p style="color: var(--text-muted); margin-bottom: 25px;">Selecione o modelo que pretende gerar:</p>
+      <button class="btn-modal" onclick="window.location.href='/contratacao/renovacao-integral'">📄 Renovação - Tempo Integral</button>
+      <button class="btn-modal" onclick="window.location.href='/contratacao/renovacao-parcial'">📄 Renovação - Tempo Parcial</button>
+      <button class="btn-modal" onclick="window.location.href='/contratacao/primeira-vez'">📄 Primeira Contratação (Edital)</button>
+      <button class="btn-fechar" onclick="fecharModal()">Cancelar e Voltar</button>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Script das TABS (Assistente vs Documentos)
+  document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.panel).classList.add('active');
+    });
   });
 
-  // --- MODAL NOVO PROCESSO ---
-  const btnNovo = document.getElementById('btn-novo-processo');
-  const modal = document.getElementById('modal-processo');
-  const btnFechar = document.getElementById('fechar-modal');
-  if(btnNovo) btnNovo.onclick = () => modal.style.display = 'flex';
-  if(btnFechar) btnFechar.onclick = () => modal.style.display = 'none';
-  window.onclick = (e) => { if (e.target == modal) modal.style.display = 'none'; }
-
-  // --- FUNÇÃO DE DROPDOWN (ACORDÉON) ---
-  function toggleSection(element) {
-    element.classList.toggle('collapsed');
-  }
-
-  // --- LÓGICA DO CHAT (CORRIGIDA) ---
-  const chatWindow = document.getElementById('chat-window');
-  const chatInput  = document.getElementById('chat-input');
-  const sendBtn    = document.getElementById('send-btn');
-
-  async function sendMessage() {
-    const text = chatInput.value.trim();
-    if (!text) return;
-
-    // Bloqueia o input enquanto processa
-    chatInput.value = '';
-    chatInput.disabled = true;
-    sendBtn.disabled = true;
-
-    // Adiciona mensagem do utilizador
-    const userMsg = document.createElement('div');
-    userMsg.className = 'msg user';
-    userMsg.innerHTML = `<div class="msg-avatar">TU</div><div class="msg-bubble">${text}</div>`;
-    chatWindow.appendChild(userMsg);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    // Mostra indicador de "a escrever..."
-    const typingMsg = document.createElement('div');
-    typingMsg.className = 'msg bot';
-    typingMsg.id = 'typing-indicator';
-    typingMsg.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble">...</div>`;
-    chatWindow.appendChild(typingMsg);
-
-    try {
-      const res = await fetch('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
-      });
-      
-      const data = await res.json();
-      
-      // Remove indicador e adiciona resposta
-      if(document.getElementById('typing-indicator')) document.getElementById('typing-indicator').remove();
-      
-      const botMsg = document.createElement('div');
-      botMsg.className = 'msg bot';
-      botMsg.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble">${data.reply || "Sem resposta."}</div>`;
-      chatWindow.appendChild(botMsg);
-      chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    } catch (e) {
-      if(document.getElementById('typing-indicator')) document.getElementById('typing-indicator').remove();
-      console.error("Erro no chat:", e);
-    } finally {
-      chatInput.disabled = false;
-      sendBtn.disabled = false;
-      chatInput.focus();
+  // NOVO SCRIPT: Abrir/Fechar Pastas
+  function toggleFolder(headerElement) {
+    const content = headerElement.nextElementSibling;
+    const arrow = headerElement.querySelector('.folder-arrow');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      arrow.style.transform = 'rotate(0deg)';
+    } else {
+      content.style.display = 'none';
+      arrow.style.transform = 'rotate(-90deg)'; // Roda a seta para apontar para a direita
     }
   }
 
-  // Evento de Clique
-  if(sendBtn) {
-    sendBtn.onclick = (e) => {
-      e.preventDefault();
-      sendMessage();
-    };
+  // Script do Modal
+  const modal = document.getElementById('modal-processo');
+  document.getElementById('btn-novo-processo').addEventListener('click', () => modal.classList.add('active'));
+  function fecharModal() { modal.classList.remove('active'); }
+  window.onclick = function(event) { if (event.target == modal) fecharModal(); }
+
+  // Script do Chatbox
+  async function enviarMensagem() {
+    const inputField = document.getElementById('user-input');
+    const msgText = inputField.value.trim();
+    if (!msgText) return;
+
+    const chatBox = document.getElementById('chat-box');
+    const userDiv = document.createElement('div');
+    userDiv.className = 'msg msg-user';
+    userDiv.innerText = msgText;
+    chatBox.appendChild(userDiv);
+    inputField.value = '';
+    
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'msg msg-ai';
+    loadingDiv.innerHTML = '<span style="color: var(--text-muted);">A analisar documentos e processos...</span>';
+    chatBox.appendChild(loadingDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+      const response = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msgText }) });
+      const data = await response.json();
+      chatBox.removeChild(loadingDiv);
+      const aiDiv = document.createElement('div');
+      aiDiv.className = 'msg msg-ai';
+      aiDiv.innerText = data.reply;
+      chatBox.appendChild(aiDiv);
+    } catch (err) {
+      chatBox.removeChild(loadingDiv);
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg msg-ai';
+      errDiv.style.color = 'red';
+      errDiv.innerText = 'Erro ao contactar a IA.';
+      chatBox.appendChild(errDiv);
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
   }
 
-  // Evento de Tecla Enter
-  if(chatInput) {
-    chatInput.onkeydown = (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // Impede a nova linha
-        sendMessage();
+  function handleKeyPress(e) { if (e.key === 'Enter') enviarMensagem(); }
+
+  // Lógica de Upload de Ficheiros
+  const fileInput = document.getElementById('file-input');
+  
+  fileInput.addEventListener('change', async function() {
+    if (this.files.length === 0) return;
+    
+    // Preparar os dados para envio
+    const formData = new FormData();
+    for (let i = 0; i < this.files.length; i++) {
+      formData.append('file', this.files[i]);
+    }
+    
+    // Feedback visual na UI
+    const titleArea = document.querySelector('.upload-area h3');
+    const textoOriginal = titleArea.innerText;
+    titleArea.innerText = "A carregar ficheiro(s)...";
+    titleArea.style.color = "var(--primary)";
+    
+    try {
+      const response = await fetch('/upload-documento', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        // Recarrega a página para o documento aparecer na listagem da BD
+        window.location.reload(); 
+      } else {
+        alert("Erro: " + result.erro);
       }
-    };
-  }
+    } catch (error) {
+      console.error("Erro no fetch do upload:", error);
+      alert("Ocorreu um erro ao comunicar com o servidor.");
+    } finally {
+      // Repor o estado original
+      titleArea.innerText = textoOriginal;
+      titleArea.style.color = "var(--text)";
+      this.value = ''; // Limpar o input
+    }
+  });
 </script>
-
-
-</body>
-</html>
+{% endblock %}
