@@ -52,6 +52,8 @@
     <option value="2024/2025">
     <option value="2025/2026">
     <option value="2026/2027">
+    <option value="2027/2028">
+    <option value="2028/2029">
   </datalist>
   
   <datalist id="lista-funcoes">
@@ -76,6 +78,15 @@
 
     <div class="section-title">Dados do Docente e Contratação</div>
     <div class="form-grid">
+      <div class="form-group full-width" id="docente-dropdown-group" style="display:none;">
+        <label>Selecionar Docente Existente</label>
+        <select id="docente_select">
+          <option value="">-- Selecionar docente --</option>
+          {% for prof in professores %}
+            <option value="{{ prof }}">{{ prof }}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="form-group full-width">
         <label>Nome Completo do Docente *</label>
         <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto" value="{{ form_data.get('nome_docente', '') if form_data else '' }}">
@@ -99,6 +110,18 @@
       <div class="form-group">
         <label>Área de Contratação *</label>
         <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required placeholder="Ex: Informática" value="{{ form_data.get('area_contratacao', '') if form_data else '' }}">
+      </div>
+      <div class="form-group" id="horario-semanal-group" style="display:none;">
+        <label>Horário Semanal</label>
+        <select name="horario_semanal">
+          <option value="">Escolher horário</option>
+          {% for carga in cargas %}
+            <option value="Carga {{ carga.id_carga }}: {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{ carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)"
+              {% if form_data and form_data.get('horario_semanal', '') == ('Carga ' ~ carga.id_carga ~ ': ' ~ carga.tempo_contratual ~ 'h total / ' ~ carga.tempo_aulas ~ 'h aulas / ' ~ carga.tempo_apoio ~ 'h apoio / ' ~ carga.tempo_preparacao ~ 'h preparação (' ~ carga.percentagem ~ '%)') %}selected{% endif %}>
+              Carga {{ carga.id_carga }} — {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{ carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)
+            </option>
+          {% endfor %}
+        </select>
       </div>
       <div class="form-group">
         <label>Áreas Curriculares *</label>
@@ -136,46 +159,78 @@
       </div>
     </div>
 
-    <div id="section-ucs" class="{% if tipo == 'primeira-vez' %}hidden{% endif %}">
+    <div id="section-ucs">
         <div class="section-title">Distribuição de Serviço (UCs)</div>
-        <div class="form-grid">
-            <div class="form-group">
-                <label>UC 1</label>
-                <input type="text" name="uc_1" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_1', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Horas UC 1</label>
-                <input type="number" name="horas_1" min="0" step="0.5" value="{{ form_data.get('horas_1', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Curso UC 1</label>
-                <input type="text" name="curso_1" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_1', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Ciclo UC 1</label>
-                <input type="text" name="ciclo_1" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_1', '') if form_data else '' }}">
+        
+        <div id="lista-ucs-container">
+            <div class="form-grid uc-block">
+                <div class="form-group">
+                    <label>UC 1</label>
+                    <input type="text" name="uc_1" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_1', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Horas UC 1</label>
+                    <input type="number" name="horas_1" min="0" step="0.5" value="{{ form_data.get('horas_1', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Curso UC 1</label>
+                    <input type="text" name="curso_1" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_1', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Ciclo UC 1</label>
+                    <input type="text" name="ciclo_1" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_1', '') if form_data else '' }}">
+                </div>
             </div>
             
-            <div class="form-group">
-                <label>UC 2</label>
-                <input type="text" name="uc_2" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_2', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Horas UC 2</label>
-                <input type="number" name="horas_2" min="0" step="0.5" value="{{ form_data.get('horas_2', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Curso UC 2</label>
-                <input type="text" name="curso_2" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_2', '') if form_data else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Ciclo UC 2</label>
-                <input type="text" name="ciclo_2" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_2', '') if form_data else '' }}">
+            <div class="form-grid uc-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
+                <div class="form-group">
+                    <label>UC 2</label>
+                    <input type="text" name="uc_2" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_2', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Horas UC 2</label>
+                    <input type="number" name="horas_2" min="0" step="0.5" value="{{ form_data.get('horas_2', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Curso UC 2</label>
+                    <input type="text" name="curso_2" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_2', '') if form_data else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Ciclo UC 2</label>
+                    <input type="text" name="ciclo_2" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_2', '') if form_data else '' }}">
+                </div>
             </div>
 
+            {% if form_data %}
+                {% for i in range(3, 15) %}
+                    {% if form_data.get('uc_' ~ i) or form_data.get('horas_' ~ i) %}
+                    <div class="form-grid uc-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
+                        <div class="form-group"><label>UC {{ i }}</label><input type="text" name="uc_{{ i }}" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_' ~ i, '') }}"></div>
+                        <div class="form-group"><label>Horas UC {{ i }}</label><input type="number" name="horas_{{ i }}" min="0" step="0.5" value="{{ form_data.get('horas_' ~ i, '') }}"></div>
+                        <div class="form-group"><label>Curso UC {{ i }}</label><input type="text" name="curso_{{ i }}" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_' ~ i, '') }}"></div>
+                        <div class="form-group"><label>Ciclo UC {{ i }}</label><input type="text" name="ciclo_{{ i }}" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_' ~ i, '') }}"></div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button type="button" class="btn btn-draft" style="padding: 8px 20px; font-size: 0.95rem; border-radius: 20px;" onclick="adicionarNovaUC()">+ Adicionar outra UC</button>
+        </div>
+
+        <div class="form-grid" style="margin-top: 25px;">
             <div class="form-group full-width">
                 <label>Total de Horas de Contacto</label>
-                <input type="number" name="total_horas_contacto" min="0" step="0.5" value="{{ form_data.get('total_horas_contacto', '') if form_data else '' }}">
+                
+                <div id="total_horas_integral" style="display:none; padding: 12px; background: var(--hover-bg); border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; color: var(--text);">
+                    <strong>35 horas (Tempo Integral)</strong>
+                </div>
+                <input type="hidden" name="total_horas_contacto" value="35" id="total_horas_contacto_hidden">
+                
+                <select name="total_horas_contacto" id="total_horas_contacto" style="display:none;">
+                    <option value="">Escolher carga horária...</option>
+                </select>
             </div>
         </div>
     </div>
@@ -196,16 +251,180 @@
 
 {% block scripts %}
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
+  let cargasDisponíveis = [];
+
+document.addEventListener('DOMContentLoaded', async function() {
     const tipo = "{{ tipo }}";
     const anoAnteriorGroup = document.getElementById('ano-anterior-group');
+    const docenteDropdownGroup = document.getElementById('docente-dropdown-group');
+    const horarioSemanalGroup = document.getElementById('horario-semanal-group');
+    
+    const totalHorasIntegral = document.getElementById('total_horas_integral');
+    const totalHorasDropdown = document.getElementById('total_horas_contacto');
+
     if (tipo === 'primeira-vez') {
       anoAnteriorGroup.style.display = 'none';
       const input = anoAnteriorGroup.querySelector('input');
       if (input) input.required = false;
     }
+
+    if (tipo === 'renovacao-integral') {
+      if (docenteDropdownGroup) docenteDropdownGroup.style.display = 'block';
+      if (totalHorasIntegral) totalHorasIntegral.style.display = 'block';
+      if (totalHorasDropdown) totalHorasDropdown.style.display = 'none';
+      
+    } else if (tipo === 'renovacao-parcial' || tipo === 'primeira-vez') {
+      // Como a Primeira Vez também é parcial, ambas abrem o Dropdown da BD!
+      if (tipo === 'renovacao-parcial') {
+        if (docenteDropdownGroup) docenteDropdownGroup.style.display = 'block';
+        if (horarioSemanalGroup) horarioSemanalGroup.style.display = 'block';
+      }
+      
+      // Mostrar o dropdown das horas que vem da Base de Dados
+      if (totalHorasIntegral) totalHorasIntegral.style.display = 'none';
+      if (totalHorasDropdown) totalHorasDropdown.style.display = 'block';
+      
+      // Carregar as horas da base de dados (11, 16, etc.)
+      await carregarCargasHorias();
+    }
+
+    const docenteSelect = document.getElementById('docente_select');
+    const nomeDocenteInput = document.querySelector('input[name="nome_docente"]');
+
+    if (docenteSelect && nomeDocenteInput) {
+      docenteSelect.addEventListener('change', function() {
+        const nome = this.value;
+        if (nome) {
+          nomeDocenteInput.value = nome;
+          preencherDadosDocente(nome);
+        }
+      });
+
+      nomeDocenteInput.addEventListener('blur', function() {
+        const nome = this.value.trim();
+        if (nome) {
+          preencherDadosDocente(nome);
+        }
+      });
+    }
   });
 
+  // Função para adicionar novas UCs Dinamicamente
+  function adicionarNovaUC() {
+    const ucInputs = document.querySelectorAll('input[name^="uc_"]');
+    const novaUCIndex = ucInputs.length + 1;
+    
+    const container = document.getElementById('lista-ucs-container');
+    const novaUC = document.createElement('div');
+    novaUC.className = 'form-grid uc-block';
+    novaUC.style.marginTop = '15px';
+    novaUC.style.paddingTop = '15px';
+    novaUC.style.borderTop = '1px dashed var(--border)';
+    
+    novaUC.innerHTML = `
+        <div class="form-group">
+            <label>UC ${novaUCIndex}</label>
+            <input type="text" name="uc_${novaUCIndex}" list="lista-ucs" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label>Horas UC ${novaUCIndex}</label>
+            <input type="number" name="horas_${novaUCIndex}" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+            <label>Curso UC ${novaUCIndex}</label>
+            <input type="text" name="curso_${novaUCIndex}" list="lista-cursos" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label>Ciclo UC ${novaUCIndex}</label>
+            <input type="text" name="ciclo_${novaUCIndex}" list="lista-ciclos" autocomplete="off">
+        </div>
+    `;
+    container.appendChild(novaUC);
+  }
+
+  async function carregarCargasHorias() {
+    try {
+      const response = await fetch('/api/cargas-horias');
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      cargasDisponíveis = data.cargas;
+      
+      const select = document.getElementById('total_horas_contacto');
+      if (select) {
+        while (select.options.length > 1) {
+          select.remove(1);
+        }
+        cargasDisponíveis.forEach(carga => {
+          const option = document.createElement('option');
+          option.value = carga.tempo_aulas;
+          option.textContent = carga.display;
+          select.appendChild(option);
+        });
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar cargas horárias:', err);
+    }
+  }
+
+  async function preencherDadosDocente(nome) {
+    try {
+      const response = await fetch(`/api/docente-detalhes?nome=${encodeURIComponent(nome)}`);
+      if (!response.ok) return;
+
+      const result = await response.json();
+      
+      // Percorrer TODAS as chaves devolvidas pelo servidor
+      Object.entries(result).forEach(([key, value]) => {
+         if (value) {
+            // Se o histórico tiver a "UC 4", precisamos de clicar no botão automaticamente
+            // até que a caixa da UC 4 apareça no ecrã para a podermos preencher!
+            if (key.startsWith('uc_') || key.startsWith('horas_') || key.startsWith('curso_') || key.startsWith('ciclo_')) {
+                const parts = key.split('_');
+                const idx = parseInt(parts[parts.length - 1]);
+                
+                if (!isNaN(idx)) {
+                    while (document.querySelectorAll('input[name^="uc_"]').length < idx) {
+                        if (typeof adicionarNovaUC === "function") {
+                            adicionarNovaUC();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Preencher a caixa que corresponda ao nome (ex: name="profAAA", name="uc_1", etc)
+            const input = document.querySelector(`[name="${key}"]`);
+            if (input && (!input.value || input.value.trim() === '')) {
+              input.value = value;
+            }
+         }
+      });
+      
+      // Preencher o dropdown de total_horas_contacto
+      if (result.total_horas_contacto) {
+        const selectHoras = document.getElementById('total_horas_contacto');
+        if (selectHoras) {
+          const option = Array.from(selectHoras.options).find(opt => opt.value == result.total_horas_contacto);
+          if (option) selectHoras.value = option.value;
+        }
+      }
+      
+      // Preencher o dropdown de horario_semanal se existir
+      if (result.horario_semanal) {
+        const selectHorario = document.querySelector('select[name="horario_semanal"]');
+        if (selectHorario) {
+          const option = Array.from(selectHorario.options).find(opt => opt.value.includes(result.horario_semanal));
+          if (option) selectHorario.value = option.value;
+        }
+      }
+    } catch (err) {
+      console.warn('Não foi possível carregar dados do docente:', err);
+    }
+  }
+
+  // --- LÓGICAS DOS BOTÕES (GUARDAR E SUBMETER) ---
   async function guardarRascunho(btn) {
     const form = document.getElementById('formContratacao');
     const formData = new FormData(form);
@@ -228,12 +447,8 @@
         body: JSON.stringify(data)
       });
       const result = await response.json();
-      
-      if (response.ok && result.sucesso) {
-        alert('Rascunho guardado com sucesso!');
-      } else {
-        alert('Erro ao guardar rascunho: ' + (result.erro || 'Erro desconhecido'));
-      }
+      if (response.ok && result.sucesso) alert('Rascunho guardado com sucesso!');
+      else alert('Erro ao guardar rascunho: ' + (result.erro || 'Erro desconhecido'));
     } catch (err) {
       alert('Erro de ligação ao servidor.');
     } finally {
@@ -251,13 +466,16 @@
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const rascunhoId = urlParams.get('rascunho_id');
+    if (rascunhoId) data.rascunho_id = rascunhoId;
+
     try {
       const response = await fetch('/submeter-contratacao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-
       const result = await response.json();
       if (response.ok) {
         alert('Processo e documentos gerados com sucesso!');

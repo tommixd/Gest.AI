@@ -1,11 +1,9 @@
 import docx
 import os
-import sqlite3
 import re
 import json
-
-# Define o caminho para a BD 
-DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'documentos.db')
+import mysql.connector
+from db_config import DB_CONFIG
 
 # ---------------------------------------------------------
 # NOVIDADE: MAPEAMENTO PARA A CATEGORIA DA BASE DE DADOS
@@ -54,18 +52,18 @@ def processar_renovacao(dados_contrato):
     # 3. Ligar à BD e procurar TODOS os templates dessa categoria!
     templates_encontrados = []
     try:
-        ligacao = sqlite3.connect(DATABASE)
-        ligacao.row_factory = sqlite3.Row
-        cursor = ligacao.cursor()
+        ligacao = mysql.connector.connect(**DB_CONFIG)
+        cursor = ligacao.cursor(dictionary=True)
         
         # MAGIA AQUI: Em vez de procurar por nomes, procuramos por categoria!
         query = "SELECT nome, caminho FROM documentos WHERE categoria = %s"
         cursor.execute(query, (categoria_bd,))
         templates_encontrados = cursor.fetchall()
+        cursor.close()
         ligacao.close()
         
     except Exception as e:
-        print(f"[!] Erro ao ligar à base de dados SQLite: {e}")
+        print(f"[!] Erro ao ligar à base de dados MySQL: {e}")
         return
 
     if not templates_encontrados:
@@ -91,7 +89,7 @@ def processar_renovacao(dados_contrato):
             mapa_substituicao = {}
             for k, v in dados_contrato.items():
                 chave_limpa = k.replace("{", "").replace("}", "").strip()
-                mapa_substituicao[f"{{{{{chave_limpa}}}}}"] = str(v)
+                mapa_substituicao[f"{{{chave_limpa}}}"] = str(v)
 
             # Função auxiliar para substituir texto em parágrafos e tabelas
             def substituir_texto(container):

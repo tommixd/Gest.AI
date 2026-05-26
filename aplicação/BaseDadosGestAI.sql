@@ -78,13 +78,18 @@ CREATE TABLE `contratos` (
   `id_contrato` int NOT NULL AUTO_INCREMENT,
   `data_inicio` date DEFAULT NULL,
   `data_fim` date DEFAULT NULL,
+  `numero_renovacao` int DEFAULT 1,
+  `contrato_original_id` int DEFAULT NULL,
+  `data_renovacao` date DEFAULT NULL,
   `templates_id_template` int NOT NULL,
   `carga_horaria_id_carga` int NOT NULL,
   PRIMARY KEY (`id_contrato`),
   KEY `fk_contratos_templates1_idx` (`templates_id_template`),
   KEY `fk_contratos_carga_horaria1_idx` (`carga_horaria_id_carga`),
+  KEY `fk_contratos_original_idx` (`contrato_original_id`),
   CONSTRAINT `fk_contratos_carga_horaria1` FOREIGN KEY (`carga_horaria_id_carga`) REFERENCES `carga_horaria` (`id_carga`),
-  CONSTRAINT `fk_contratos_templates1` FOREIGN KEY (`templates_id_template`) REFERENCES `mydb`.`templates` (`id_template`)
+  CONSTRAINT `fk_contratos_templates1` FOREIGN KEY (`templates_id_template`) REFERENCES `mydb`.`templates` (`id_template`),
+  CONSTRAINT `fk_contratos_original` FOREIGN KEY (`contrato_original_id`) REFERENCES `contratos` (`id_contrato`)
 ) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -189,8 +194,12 @@ CREATE TABLE `documentos` (
   `nome` varchar(255) NOT NULL,
   `caminho` varchar(500) NOT NULL,
   `categoria` varchar(100) NOT NULL,
-  `data_upload` varchar(100) NOT NULL,
-  PRIMARY KEY (`id`)
+  `data_upload` date NOT NULL,
+  `contrato_id` int DEFAULT NULL,
+  `versao_contrato` int DEFAULT 1,
+  PRIMARY KEY (`id`),
+  KEY `fk_documentos_contrato_idx` (`contrato_id`),
+  CONSTRAINT `fk_documentos_contrato` FOREIGN KEY (`contrato_id`) REFERENCES `contratos` (`id_contrato`)
 ) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -216,7 +225,7 @@ CREATE TABLE `rascunhos` (
   `nome_docente` varchar(255) DEFAULT NULL,
   `tipo_contrato` varchar(100) DEFAULT NULL,
   `dados_formulario` text NOT NULL,
-  `data_guardado` varchar(100) NOT NULL,
+  `data_guardado` date NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;

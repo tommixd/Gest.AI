@@ -5,18 +5,35 @@
 {% block extra_css %}
   /* Aqui fica SÓ o CSS específico dos cartões de rascunhos! */
   .container { max-width: 900px; margin: 0 auto; background: var(--panel-bg); padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px var(--shadow); transition: 0.3s; }
-  .header-titulo { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .header-titulo { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 20px; flex-wrap: wrap; }
   h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin: 0; color: var(--title-color); }
+  .header-acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-apagar-todos { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-apagar-todos:hover { background: #c0392b; }
   .subtitle { color: var(--text-muted); margin-bottom: 30px; font-size: 1.05rem; }
   .grid-rascunhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
-  .card-rascunho { border: 1px solid var(--border); border-radius: 8px; padding: 20px; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; background: var(--panel-bg); }
+  .card-rascunho { border: 1px solid var(--border); border-radius: 8px; padding: 20px; transition: 0.2s; display: flex; flex-direction: column; justify-content: space-between; background: var(--panel-bg); position: relative; }
   .card-rascunho:hover { border-color: var(--primary); box-shadow: 0 4px 12px var(--shadow); transform: translateY(-2px); }
-  .nome-docente { font-size: 1.25rem; font-weight: 600; color: var(--title-color); margin-bottom: 8px; }
+  .btn-apagar-rascunho { position: absolute; top: 15px; right: 15px; background: #e74c3c; color: white; border: none; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+  .btn-apagar-rascunho:hover { background: #c0392b; }
+  .nome-docente { font-size: 1.25rem; font-weight: 600; color: var(--title-color); margin-bottom: 8px; padding-right: 35px; }
   .meta-info { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
   .badge { display: inline-block; background: var(--btn-draft-bg); color: var(--primary); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; margin-bottom: 15px; }
   .btn-retomar { background: var(--panel-bg); color: var(--primary); border: 1px solid var(--primary); text-align: center; text-decoration: none; padding: 10px; border-radius: 6px; font-weight: 600; transition: 0.2s; display: block; }
   .btn-retomar:hover { background: var(--primary); color: white; }
   .sem-rascunhos { text-align: center; padding: 50px 20px; color: var(--text-muted); background: var(--hover-bg); border-radius: 8px; border: 1px dashed var(--border); }
+  
+  /* Modal de confirmação */
+  .modal-confirmacao { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(3px); }
+  .modal-confirmacao.active { display: flex; }
+  .modal-confirmacao-content { background: var(--panel-bg); padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px var(--shadow); color: var(--text); max-width: 400px; }
+  .modal-confirmacao-content h3 { font-family: 'DM Serif Display', serif; margin-top: 0; color: var(--title-color); }
+  .modal-confirmacao-content p { color: var(--text-muted); line-height: 1.5; }
+  .modal-botoes { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-confirmar { flex: 1; padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .btn-confirmar:hover { background: #c0392b; }
+  .btn-cancelar { flex: 1; padding: 12px; background: var(--border); color: var(--text); border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .btn-cancelar:hover { background: var(--hover-bg); }
 {% endblock %}
 
 {% block content %}
@@ -26,12 +43,18 @@
       <h1>Os Meus Rascunhos</h1>
       <p class="subtitle">Retome os processos de contratação que guardou anteriormente.</p>
     </div>
+    {% if rascunhos %}
+    <div class="header-acoes">
+      <button class="btn-apagar-todos" onclick="abrirModalApagarTodos()">🗑️ Apagar Todos</button>
+    </div>
+    {% endif %}
   </div>
 
   {% if rascunhos %}
     <div class="grid-rascunhos">
       {% for rascunho in rascunhos %}
         <div class="card-rascunho">
+          <button class="btn-apagar-rascunho" onclick="abrirModalApagarRascunho({{ rascunho.id }}, '{{ rascunho.nome_docente }}');" title="Apagar este rascunho">✕</button>
           <div>
             <div class="badge">{{ rascunho.tipo_contrato }}</div>
             <div class="nome-docente">{{ rascunho.nome_docente }}</div>
@@ -52,4 +75,81 @@
     </div>
   {% endif %}
 </div>
+
+<!-- Modal de Confirmação -->
+<div id="modal-confirmacao" class="modal-confirmacao">
+  <div class="modal-confirmacao-content">
+    <h3 id="modal-titulo">Confirmar Eliminação</h3>
+    <p id="modal-mensagem">Tem a certeza que deseja apagar este rascunho?</p>
+    <div class="modal-botoes">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-confirmar" id="btn-confirmar-apagar" onclick="confirmarApagar()">Apagar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let tipoApagar = null; // 'todos', 'um', ou null
+  let rascunhoIdAtual = null;
+
+  function abrirModalApagarTodos() {
+    tipoApagar = 'todos';
+    document.getElementById('modal-titulo').textContent = 'Apagar Todos os Rascunhos?';
+    document.getElementById('modal-mensagem').textContent = 'Esta ação não pode ser desfeita. Todos os rascunhos guardados serão eliminados permanentemente.';
+    document.getElementById('modal-confirmacao').classList.add('active');
+  }
+
+  function abrirModalApagarRascunho(id, nome) {
+    tipoApagar = 'um';
+    rascunhoIdAtual = id;
+    document.getElementById('modal-titulo').textContent = 'Apagar Rascunho?';
+    document.getElementById('modal-mensagem').textContent = `Deseja apagar o rascunho de "${nome}"? Esta ação não pode ser desfeita.`;
+    document.getElementById('modal-confirmacao').classList.add('active');
+  }
+
+  function fecharModal() {
+    document.getElementById('modal-confirmacao').classList.remove('active');
+    tipoApagar = null;
+    rascunhoIdAtual = null;
+  }
+
+  async function confirmarApagar() {
+    const btnConfirmar = document.getElementById('btn-confirmar-apagar');
+    btnConfirmar.disabled = true;
+    btnConfirmar.textContent = 'A apagar...';
+
+    try {
+      let url = '';
+      if (tipoApagar === 'todos') {
+        url = '/api/apagar-todos-rascunhos';
+      } else if (tipoApagar === 'um') {
+        url = `/api/apagar-rascunho/${rascunhoIdAtual}`;
+      }
+
+      const response = await fetch(url, { method: 'DELETE' });
+      const data = await response.json();
+
+      if (data.sucesso) {
+        alert('Rascunho(s) apagado(s) com sucesso!');
+        location.reload(); // Recarregar página
+      } else {
+        alert('Erro: ' + (data.erro || 'Não foi possível apagar.'));
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao apagar rascunho: ' + error.message);
+    } finally {
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = 'Apagar';
+      fecharModal();
+    }
+  }
+
+  window.onclick = function(event) {
+    const modal = document.getElementById('modal-confirmacao');
+    if (event.target == modal) {
+      fecharModal();
+    }
+  }
+</script>
 {% endblock %}

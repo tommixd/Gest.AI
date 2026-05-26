@@ -49,6 +49,59 @@
   .btn-modal { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-bg); color: var(--text); text-align: left; font-size: 1.05rem; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
   .btn-modal:hover { border-color: var(--primary); background: var(--btn-draft-bg); color: var(--primary); transform: translateY(-2px); }
   .btn-fechar { background: none; border: none; color: var(--text-muted); font-size: 0.9rem; text-decoration: underline; cursor: pointer; display: block; text-align: center; width: 100%; margin-top: 15px; font-family: 'Outfit', sans-serif; }
+  
+  /* Estilos para botões de delete */
+  .btn-delete-item { background: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: 0.2s; margin-left: 8px; }
+  .btn-delete-item:hover { background: #c0392b; }
+  .btn-delete-pasta { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; margin-left: 10px; }
+  .btn-delete-pasta:hover { background: #c0392b; }
+  
+  /* Estilos para item de documento melhorado */
+  .doc-item-container { display: flex; align-items: center; justify-content: space-between; padding: 12px 10px; border-radius: 6px; transition: background 0.2s; }
+  .doc-item-container:hover { background: var(--hover-bg); }
+  .doc-item-info { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .doc-item-link { color: var(--text); text-decoration: none; font-weight: 500; transition: color 0.2s; word-break: break-word; }
+  .doc-item-link:hover { color: var(--primary); }
+  .doc-item-date { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+  .doc-item-actions { display: flex; gap: 8px; align-items: center; opacity: 0; transition: opacity 0.2s; }
+  .doc-item-container:hover .doc-item-actions { opacity: 1; }
+  .btn-action { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 4px 8px; border-radius: 4px; transition: 0.2s; }
+  .btn-action:hover { background: var(--border); color: var(--primary); }
+  .btn-action-delete { color: #e74c3c; }
+  .btn-action-delete:hover { background: rgba(231, 76, 60, 0.1); color: #c0392b; }
+  
+  /* Estilo para pasta header melhorado */
+  .folder-header-container { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .folder-header { flex: 1; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-radius: 8px; background: transparent; transition: background 0.2s; user-select: none; font-weight: 600; color: var(--text); }
+  .folder-header:hover { background: var(--hover-bg); }
+  .folder-arrow { font-size: 0.75rem; color: var(--text-muted); transition: transform 0.3s; }
+  .folder-actions { display: flex; gap: 8px; align-items: center; opacity: 0; transition: opacity 0.2s; }
+  .folder-header-container:hover .folder-actions { opacity: 1; }
+  
+  /* Modal de editar nome */
+  .modal-rename { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1001; backdrop-filter: blur(3px); }
+  .modal-rename.active { display: flex; }
+  .modal-rename-content { background: var(--panel-bg); padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px var(--shadow); color: var(--text); max-width: 450px; width: 90%; }
+  .modal-rename-content h3 { font-family: 'DM Serif Display', serif; margin-top: 0; color: var(--title-color); }
+  .modal-rename-input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 1rem; font-family: 'Outfit', sans-serif; margin-bottom: 20px; box-sizing: border-box; }
+  .modal-rename-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
+  .modal-rename-botoes { display: flex; gap: 10px; }
+  .btn-rename-confirmar { flex: 1; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-rename-confirmar:hover { background: var(--primary-hover); }
+  .btn-rename-cancelar { flex: 1; padding: 12px; background: var(--border); color: var(--text); border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-rename-cancelar:hover { background: var(--hover-bg); }
+  
+  /* Modal de confirmação */
+  .modal-confirmacao { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1001; backdrop-filter: blur(3px); }
+  .modal-confirmacao.active { display: flex; }
+  .modal-confirmacao-content { background: var(--panel-bg); padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px var(--shadow); color: var(--text); max-width: 400px; }
+  .modal-confirmacao-content h3 { font-family: 'DM Serif Display', serif; margin-top: 0; color: var(--title-color); }
+  .modal-confirmacao-content p { color: var(--text-muted); line-height: 1.5; }
+  .modal-botoes { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-confirmar { flex: 1; padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-confirmar:hover { background: #c0392b; }
+  .btn-cancelar { flex: 1; padding: 12px; background: var(--border); color: var(--text); border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+  .btn-cancelar:hover { background: var(--hover-bg); }
 {% endblock %}
 
 {% block nav_buttons %}
@@ -97,17 +150,29 @@
             {% for caso, docs in casos.items() %}
               <div style="margin-top: 15px;">
                 <!-- Cabeçalho da Pasta Clicável -->
-                <div class="folder-header" onclick="toggleFolder(this)">
-                  <span class="folder-arrow">▼</span>
-                  <span>📁 {{ caso }}</span>
+                <div class="folder-header-container">
+                  <div class="folder-header" onclick="toggleFolder(this.parentElement.nextElementSibling)">
+                    <span class="folder-arrow">▼</span>
+                    <span>📁 {{ caso }}</span>
+                  </div>
+                  <div class="folder-actions">
+                    <button class="btn-action btn-action-delete" onclick="abrirModalApagarPasta('{{ caso }}')" title="Apagar pasta">🗑️</button>
+                  </div>
                 </div>
                 
                 <!-- Conteúdo da Pasta (Ficheiros) -->
                 <div class="folder-content" style="display: block;">
                   {% for doc in docs %}
-                    <div class="doc-item">
-                      📄 <a href="/ver_documento/{{ doc.id }}" target="_blank">{{ doc.nome }}</a>
-                      <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 5px;">({{ doc.data_upload[:10] }})</span>
+                    <div class="doc-item-container">
+                      <div class="doc-item-info">
+                        <span>📄</span>
+                        <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
+                        <span class="doc-item-date">({{ doc.data_upload.strftime('%Y-%m-%d') }})</span>
+                      </div>
+                      <div class="doc-item-actions">
+                        <button class="btn-action" onclick="abrirModalRenomear({{ doc.id }}, '{{ doc.nome }}')" title="Editar nome">✏️</button>
+                        <button class="btn-action btn-action-delete" onclick="abrirModalApagarDocumento({{ doc.id }}, '{{ doc.nome }}')" title="Apagar">✕</button>
+                      </div>
                     </div>
                   {% endfor %}
                 </div>
@@ -133,6 +198,30 @@
       <button class="btn-fechar" onclick="fecharModal()">Cancelar e Voltar</button>
     </div>
   </div>
+
+  <!-- MODAL: RENOMEAR DOCUMENTO -->
+  <div id="modal-rename-doc" class="modal-rename">
+    <div class="modal-rename-content">
+      <h3>Renomear Documento</h3>
+      <input type="text" id="input-novo-nome" class="modal-rename-input" placeholder="Novo nome do documento" />
+      <div class="modal-rename-botoes">
+        <button class="btn-rename-cancelar" onclick="fecharModalRenomear()">Cancelar</button>
+        <button class="btn-rename-confirmar" id="btn-confirmar-rename" onclick="confirmarRenomear()">Renomear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAÇÃO DE APAGAR -->
+  <div id="modal-confirmacao-doc" class="modal-confirmacao">
+    <div class="modal-confirmacao-content">
+      <h3 id="modal-titulo-doc">Confirmar Eliminação</h3>
+      <p id="modal-mensagem-doc">Tem a certeza que deseja apagar este documento?</p>
+      <div class="modal-botoes">
+        <button class="btn-cancelar" onclick="fecharModalConfirmacao()">Cancelar</button>
+        <button class="btn-confirmar" id="btn-confirmar-apagar-doc" onclick="confirmarApagarDocumento()">Apagar</button>
+      </div>
+    </div>
+  </div>
 {% endblock %}
 
 {% block scripts %}
@@ -148,15 +237,14 @@
   });
 
   // NOVO SCRIPT: Abrir/Fechar Pastas
-  function toggleFolder(headerElement) {
-    const content = headerElement.nextElementSibling;
-    const arrow = headerElement.querySelector('.folder-arrow');
+  function toggleFolder(contentElement) {
+    const arrow = contentElement.previousElementSibling.querySelector('.folder-arrow');
     
-    if (content.style.display === 'none') {
-      content.style.display = 'block';
+    if (contentElement.style.display === 'none') {
+      contentElement.style.display = 'block';
       arrow.style.transform = 'rotate(0deg)';
     } else {
-      content.style.display = 'none';
+      contentElement.style.display = 'none';
       arrow.style.transform = 'rotate(-90deg)'; // Roda a seta para apontar para a direita
     }
   }
@@ -249,5 +337,136 @@
       this.value = ''; // Limpar o input
     }
   });
+
+  // --- FUNÇÕES PARA APAGAR DOCUMENTOS E PASTAS ---
+  let tipoApagarDoc = null; // 'documento' ou 'pasta'
+  let docIdAtual = null;
+  let pastaNomeAtual = null;
+  let docIdRenomear = null;
+  let nomeOriginal = null;
+
+  function abrirModalRenomear(id, nome) {
+    docIdRenomear = id;
+    nomeOriginal = nome;
+    document.getElementById('input-novo-nome').value = nome;
+    document.getElementById('modal-rename-doc').classList.add('active');
+    document.getElementById('input-novo-nome').focus();
+    document.getElementById('input-novo-nome').select();
+  }
+
+  function fecharModalRenomear() {
+    document.getElementById('modal-rename-doc').classList.remove('active');
+    docIdRenomear = null;
+    nomeOriginal = null;
+  }
+
+  async function confirmarRenomear() {
+    const novoNome = document.getElementById('input-novo-nome').value.trim();
+    
+    if (!novoNome) {
+      alert('Por favor, insira um nome para o documento.');
+      return;
+    }
+
+    if (novoNome === nomeOriginal) {
+      fecharModalRenomear();
+      return;
+    }
+
+    const btnConfirmar = document.getElementById('btn-confirmar-rename');
+    btnConfirmar.disabled = true;
+    btnConfirmar.textContent = 'A renomear...';
+
+    try {
+      const response = await fetch(`/api/renomear-documento/${docIdRenomear}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ novo_nome: novoNome })
+      });
+
+      const data = await response.json();
+
+      if (data.sucesso) {
+        alert('Documento renomeado com sucesso!');
+        location.reload();
+      } else {
+        alert('Erro: ' + (data.erro || 'Não foi possível renomear.'));
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao renomear: ' + error.message);
+    } finally {
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = 'Renomear';
+      fecharModalRenomear();
+    }
+  }
+
+  function abrirModalApagarDocumento(id, nome) {
+    tipoApagarDoc = 'documento';
+    docIdAtual = id;
+    document.getElementById('modal-titulo-doc').textContent = 'Apagar Contrato?';
+    document.getElementById('modal-mensagem-doc').innerHTML = `<strong>Deseja apagar o contrato associado a "${nome}"?</strong><br><br>⚠️ <strong>Atenção:</strong> Esta ação vai eliminar:<br>• Toda a pasta do contrato<br>• Todos os ficheiros e documentos<br>• Todos os registos na base de dados<br><br>Esta ação <strong>não pode ser desfeita</strong>.`;
+    document.getElementById('modal-confirmacao-doc').classList.add('active');
+  }
+
+  function abrirModalApagarPasta(caso) {
+    tipoApagarDoc = 'pasta';
+    pastaNomeAtual = caso;
+    document.getElementById('modal-titulo-doc').textContent = 'Apagar Pasta Completa?';
+    document.getElementById('modal-mensagem-doc').textContent = `Deseja apagar todos os ficheiros da pasta "${caso}"? Esta ação não pode ser desfeita.`;
+    document.getElementById('modal-confirmacao-doc').classList.add('active');
+  }
+
+  function fecharModalConfirmacao() {
+    document.getElementById('modal-confirmacao-doc').classList.remove('active');
+    tipoApagarDoc = null;
+    docIdAtual = null;
+    pastaNomeAtual = null;
+  }
+
+  async function confirmarApagarDocumento() {
+    const btnConfirmar = document.getElementById('btn-confirmar-apagar-doc');
+    btnConfirmar.disabled = true;
+    btnConfirmar.textContent = 'A apagar...';
+
+    try {
+      let url = '';
+      if (tipoApagarDoc === 'documento') {
+        url = `/api/apagar-documento/${docIdAtual}`;
+      } else if (tipoApagarDoc === 'pasta') {
+        url = `/api/apagar-pasta/${encodeURIComponent(pastaNomeAtual)}`;
+      }
+
+      const response = await fetch(url, { method: 'DELETE' });
+      const data = await response.json();
+
+      console.log('Resposta do servidor:', data);
+
+      if (data.sucesso) {
+        alert('✅ Documento/Pasta apagado(a) com sucesso!');
+        location.reload(); // Recarregar página
+      } else {
+        alert('❌ Erro: ' + (data.erro || 'Não foi possível apagar.'));
+        console.error('Erro completo:', data);
+      }
+    } catch (error) {
+      console.error('Erro de rede:', error);
+      alert('❌ Erro de conexão: ' + error.message);
+    } finally {
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = 'Apagar';
+      fecharModalConfirmacao();
+    }
+  }
+
+  window.onclick = function(event) {
+    const modalProc = document.getElementById('modal-processo');
+    const modalConf = document.getElementById('modal-confirmacao-doc');
+    const modalRen = document.getElementById('modal-rename-doc');
+    if (event.target == modalProc) fecharModal();
+    if (event.target == modalConf) fecharModalConfirmacao();
+    if (event.target == modalRen) fecharModalRenomear();
+  }
 </script>
 {% endblock %}

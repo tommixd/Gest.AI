@@ -5,16 +5,23 @@ import pdfplumber
 import mysql.connector
 import re
 from pathlib import Path
+from db_config import DB_CONFIG
 from collections import defaultdict
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from transformers import pipeline
 from docx import Document as DocxDocument
+
+# NOVO IMPORT PARA O MOTOR GGUF DA NVIDIA/RTX 4060
+from llama_cpp import Llama
 
 warnings.filterwarnings("ignore")
 dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Definir caminhos base
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
 
 # --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
 DB_CONFIG = {
@@ -29,8 +36,6 @@ PASTA_TO_CHUNKS = defaultdict(list)
 
 def ler_documentos_via_mysql():
     """Liga-se ao MySQL e obtém documentos, extraindo o nome da pasta."""
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    ROOT_DIR = os.path.dirname(BASE_DIR)
     
     documentos_langchain = []
     
@@ -60,7 +65,10 @@ def ler_documentos_via_mysql():
                 continue
 
         caminho_obj = Path(caminho_ficheiro)
-        nome_pasta = caminho_obj.parent.name
+        # Estrutura: Contrato_Name/2025-2026/ficheiro.docx
+        # parent = 2025-2026, parent.parent = Contrato_Name
+        periodo = caminho_obj.parent.name
+        nome_pasta = caminho_obj.parent.parent.name  # obtém o nome do contrato (ex: Contrato_Helena_Pinto)
 
         try:
             if caminho_ficheiro.lower().endswith(".docx"):
@@ -73,7 +81,8 @@ def ler_documentos_via_mysql():
                             "source": nome_doc,
                             "categoria": categoria,
                             "tipo": "docx",
-                            "pasta": nome_pasta
+                            "pasta": nome_pasta,
+                            "periodo": periodo
                         }
                     ))
 
@@ -89,7 +98,8 @@ def ler_documentos_via_mysql():
                                     "categoria": categoria,
                                     "page": num_p + 1,
                                     "tipo": "pdf",
-                                    "pasta": nome_pasta
+                                    "pasta": nome_pasta,
+                                    "periodo": periodo
                                 }
                             ))
         except Exception as e:
@@ -97,6 +107,72 @@ def ler_documentos_via_mysql():
 
     print(f"[*] Documentos carregados: {len(documentos_langchain)}")
     return documentos_langchain
+
+
+def obter_tabelas_com_coluna_nome_docente():
+    """Retorna as tabelas que contêm a coluna nome_docente na BD atual."""
+    try:
+        db = mysql.connector.connect(**DB_CONFIG)
+        cursor = db.cursor()
+        cursor.execute(
+            """
+            SELECT table_name
+            FROM information_schema.columns
+            WHERE table_schema = %s
+              AND column_name = 'nome_docente'
+            """,
+            (DB_CONFIG['database'],)
+        )
+        tabelas = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        db.close()
+        return tabelas
+    except Exception as e:
+        print(f"[!] Erro ao obter tabelas com nome_docente: {e}")
+        return []
+
+
+def buscar_registos_por_nome(nome_pessoa):
+    """Procura em todas as tabelas com nome_docente e devolve registos encontrados."""
+    resultados = []
+    tabelas = obter_tabelas_com_coluna_nome_docente()
+    if not tabelas:
+        return resultados
+
+    try:
+        db = mysql.connector.connect(**DB_CONFIG)
+        cursor = db.cursor(dictionary=True)
+        for tabela in tabelas:
+            try:
+                cursor.execute(
+                    f"SELECT * FROM `{tabela}` WHERE nome_docente LIKE %s LIMIT 5",
+                    (f"%{nome_pessoa}%",)
+                )
+                for registo in cursor.fetchall():
+                    resultados.append({
+                        'tabela': tabela,
+                        'registo': registo
+                    })
+            except Exception as sub_e:
+                print(f"[!] Erro ao consultar {tabela}: {sub_e}")
+        cursor.close()
+        db.close()
+    except Exception as e:
+        print(f"[!] Erro ao conectar à BD para buscar registos: {e}")
+
+    return resultados
+
+
+def formatar_registo_bd(tabela, registo):
+    """Formata um registo para texto compacto no prompt."""
+    campos = []
+    for chave, valor in registo.items():
+        if valor is None:
+            continue
+        campos.append(f"{chave}={valor}")
+        if len(campos) >= 6:
+            break
+    return f"[{tabela}] " + ", ".join(campos)
 
 
 def inicializar_rag():
@@ -111,7 +187,7 @@ def inicializar_rag():
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1500,
-        chunk_overlap=800,
+        chunk_overlap=300,
         separators=["\n\n", "\n", ".", " ", ""]
     )
     chunks = splitter.split_documents(docs)
@@ -121,38 +197,31 @@ def inicializar_rag():
         pasta = chunk.metadata.get('pasta', 'SEM_PASTA')
         PASTA_TO_CHUNKS[pasta].append(chunk)
 
-    print("[*] A carregar embeddings...")
+    print("[*] A carregar embeddings no CPU para poupar VRAM...")
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-        model_kwargs={'device': dispositivo}
+        model_kwargs={'device': 'cpu'}
     )
     
     db = FAISS.from_documents(chunks, embeddings)
     
-    print("[*] A carregar Qwen2.5-3B...")
-    model_id = "unsloth/Qwen2.5-3B-Instruct-bnb-4bit"
-    
-    pipe = pipeline(
-        "text-generation",
-        model=model_id,
-        model_kwargs={"dtype": torch.float16, "low_cpu_mem_usage": True},
-        max_new_tokens=512,
-        temperature=0.4,
-        top_p=0.9,
-        do_sample=True,
-        repetition_penalty=1.15,
-        device_map="auto",
-        return_full_text=False
+    # --- NOVO BLOCO GGUF PARA A RTX 4060 ---
+    print("[*] A carregar Qwen2.5-Coder-7B GGUF...")
+    model_path = os.path.join(BASE_DIR, "Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf")
+    llm = Llama(
+        model_path=model_path, # Caminho absoluto baseado no diretório do script
+        n_gpu_layers=-1, 
+        n_ctx=4096,      
+        verbose=True    
     )
     
-    retriever = db.as_retriever(search_kwargs={"k": 5, "fetch_k": 10})
-    return retriever, HuggingFacePipeline(pipeline=pipe)
+    retriever = db.as_retriever(search_kwargs={"k": 2, "fetch_k": 10})
+    return retriever, llm
 
 
 def responder_pergunta(pergunta, retriever, llm):
     global PASTA_TO_CHUNKS
     
-    # 1. Extrair nome da pessoa (AGORA SUPORTA ACENTOS E CARACTERES PORTUGUESES)
     nome_pessoa = None
     match = re.search(r'(?:da|de|do|d[ae])\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)', pergunta, re.IGNORECASE)
     if match:
@@ -164,24 +233,25 @@ def responder_pergunta(pergunta, retriever, llm):
             
     print(f"[DEBUG] Nome extraído: {nome_pessoa}")
     
-    # 2. Pesquisar dinamicamente na Base de Dados por Rascunhos
     info_bd = ""
     if nome_pessoa:
-        try:
-            db = mysql.connector.connect(**DB_CONFIG)
-            cursor = db.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM rascunhos WHERE nome_docente LIKE %s", (f"%{nome_pessoa}%",))
-            rascunho = cursor.fetchone()
-            cursor.close()
-            db.close()
-            
-            if rascunho:
-                info_bd = f"O processo de {rascunho['nome_docente']} encontra-se guardado como um RASCUNHO (Incompleto) do tipo '{rascunho['tipo_contrato']}'."
-                print(f"[DEBUG] Rascunho encontrado para: {nome_pessoa}")
-        except Exception as e:
-            print(f"[!] Erro ao consultar BD para rascunhos: {e}")
+        registos_bd = buscar_registos_por_nome(nome_pessoa)
+        if registos_bd:
+            info_partes = []
+            for item in registos_bd:
+                texto_registo = formatar_registo_bd(item['tabela'], item['registo'])
+                info_partes.append(texto_registo)
+                if item['tabela'] == 'rascunhos':
+                    rascunho = item['registo']
+                    info_partes.append(
+                        f"O processo de {rascunho.get('nome_docente')} encontra-se guardado como um RASCUNHO (Incompleto) do tipo '{rascunho.get('tipo_contrato')}'."
+                    )
+                    print(f"[DEBUG] Rascunho encontrado para: {nome_pessoa}")
 
-    # 3. Processar RAG (PDFs/Docs)
+            info_bd = "\n".join(info_partes)
+        else:
+            print(f"[DEBUG] Nenhum registo encontrado em tabelas com nome_docente para: {nome_pessoa}")
+
     docs_rel = retriever.invoke(pergunta)
     
     pasta_forcada = None
@@ -203,7 +273,6 @@ def responder_pergunta(pergunta, retriever, llm):
     if not docs_rel and not info_bd:
         return "Não encontrei documentos ou registos na base de dados sobre isso.", ""
     
-    # Ordenar: primeiro os da pasta forçada
     if pasta_forcada:
         docs_rel = sorted(docs_rel, key=lambda d: 0 if d.metadata.get('pasta') == pasta_forcada else 1)
     
@@ -216,10 +285,9 @@ def responder_pergunta(pergunta, retriever, llm):
         contexto_parts.append(f"[Documento: {fonte}]\n{conteudo}\n")
     contexto = "\n".join(contexto_parts)
     
-    # 4. Construção Orgânica do Conhecimento
     conhecimento_sistema = ""
     if info_bd:
-        conhecimento_sistema += f"Informação atual dos Rascunhos:\n{info_bd}\n\n"
+        conhecimento_sistema += f"Informação atual da base de dados:\n{info_bd}\n\n"
     if contexto:
         conhecimento_sistema += f"Informação extraída dos Documentos do processo:\n{contexto}\n\n"
     if not conhecimento_sistema:
@@ -229,7 +297,6 @@ def responder_pergunta(pergunta, retriever, llm):
     if pasta_forcada:
         instrucao = f"Se a pergunta exigir analisar documentos, foca-te na informação da pasta '{pasta_forcada}'."
 
-    # 5. Prompt Dinâmico (Livre de camisa de forças)
     prompt = f"""<|im_start|>system
 És o Gest.AI, um assistente inteligente de recursos humanos e gestão académica.
 A tua missão é responder à pergunta do utilizador de forma natural, direta e prestável.
@@ -249,14 +316,18 @@ Age como se este conhecimento fosse teu. Não uses frases robóticas como "De ac
 <|im_start|>assistant
 """
     
-    # 6. Invocar a IA
+    # --- NOVA GERAÇÃO DE TEXTO DO LlamaCpp ---
     try:
-        resposta_raw = llm.invoke(prompt)
-        resposta = resposta_raw.replace("<|im_end|>", "").strip()
+        resposta_raw = llm(
+            prompt,
+            max_tokens=512,
+            temperature=0.1,      # Temperatura super baixa para dados fiáveis
+            stop=["<|im_end|>"]   # Diz ao modelo quando a resposta acabou
+        )
+        resposta = resposta_raw["choices"][0]["text"].strip()
     except Exception as e:
         return f"Erro ao gerar resposta da IA: {e}", ""
     
-    # Opcional: Adicionar a fonte discretamente no final
     if pasta_forcada and "rascunho" not in resposta.lower() and "incompleto" not in resposta.lower():
         docs_filtrados = [d for d in docs_rel if d.metadata.get('pasta') == pasta_forcada]
         if docs_filtrados:
