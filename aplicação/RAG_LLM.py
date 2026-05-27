@@ -68,8 +68,14 @@ def ler_documentos_via_mysql():
         # Estrutura: Contrato_Name/2025-2026/ficheiro.docx
         # parent = 2025-2026, parent.parent = Contrato_Name
         periodo = caminho_obj.parent.name
-        nome_pasta = caminho_obj.parent.parent.name  # obtém o nome do contrato (ex: Contrato_Helena_Pinto)
+        nome_pasta = "Geral"
+        #Procura o nome da pasta que começa com "Contrato_" e tem o nome do docente
+        for parte in caminho_obj.parts:
+            if parte.startswith("Contrato_"):
+                nome_pasta = parte
+                break
 
+            
         try:
             if caminho_ficheiro.lower().endswith(".docx"):
                 doc_word = DocxDocument(caminho_ficheiro)
@@ -133,28 +139,41 @@ def obter_tabelas_com_coluna_nome_docente():
 
 
 def buscar_registos_por_nome(nome_pessoa):
-    """Procura em todas as tabelas com nome_docente e devolve registos encontrados."""
+    """Procura nas tabelas 'docentes' e 'rascunhos' pelos registos do docente."""
     resultados = []
-    tabelas = obter_tabelas_com_coluna_nome_docente()
-    if not tabelas:
-        return resultados
-
+    
     try:
         db = mysql.connector.connect(**DB_CONFIG)
         cursor = db.cursor(dictionary=True)
-        for tabela in tabelas:
-            try:
-                cursor.execute(
-                    f"SELECT * FROM `{tabela}` WHERE nome_docente LIKE %s LIMIT 5",
-                    (f"%{nome_pessoa}%",)
-                )
-                for registo in cursor.fetchall():
-                    resultados.append({
-                        'tabela': tabela,
-                        'registo': registo
-                    })
-            except Exception as sub_e:
-                print(f"[!] Erro ao consultar {tabela}: {sub_e}")
+        
+        # 1. Procurar na tabela DOCENTES (onde a coluna se chama 'nome')
+        try:
+            cursor.execute(
+                "SELECT * FROM docentes WHERE nome LIKE %s LIMIT 5",
+                (f"%{nome_pessoa}%",)
+            )
+            for registo in cursor.fetchall():
+                resultados.append({
+                    'tabela': 'docentes',
+                    'registo': registo
+                })
+        except Exception as e:
+            print(f"[!] Erro ao consultar docentes: {e}")
+
+        # 2. Procurar na tabela RASCUNHOS (onde a coluna se chama 'nome_docente')
+        try:
+            cursor.execute(
+                "SELECT * FROM rascunhos WHERE nome_docente LIKE %s LIMIT 5",
+                (f"%{nome_pessoa}%",)
+            )
+            for registo in cursor.fetchall():
+                resultados.append({
+                    'tabela': 'rascunhos',
+                    'registo': registo
+                })
+        except Exception as e:
+            print(f"[!] Erro ao consultar rascunhos: {e}")
+            
         cursor.close()
         db.close()
     except Exception as e:
@@ -172,7 +191,7 @@ def formatar_registo_bd(tabela, registo):
         campos.append(f"{chave}={valor}")
         if len(campos) >= 6:
             break
-    return f"[{tabela}] " + ", ".join(campos)
+    return f"[Registo do Sistema Central - Tabela: {tabela}] " + ", ".join(campos)
 
 
 def inicializar_rag():
@@ -186,7 +205,7 @@ def inicializar_rag():
         return None, None
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,
+        chunk_size=800,
         chunk_overlap=300,
         separators=["\n\n", "\n", ".", " ", ""]
     )
@@ -211,11 +230,12 @@ def inicializar_rag():
     llm = Llama(
         model_path=model_path, # Caminho absoluto baseado no diretório do script
         n_gpu_layers=-1, 
-        n_ctx=4096,      
+        n_ctx=8192,      
         verbose=True    
     )
     
-    retriever = db.as_retriever(search_kwargs={"k": 2, "fetch_k": 10})
+    # Aumentado o número de documentos recuperados (k) para dar mais contexto
+    retriever = db.as_retriever(search_kwargs={"k": 5, "fetch_k": 20})
     return retriever, llm
 
 
@@ -223,15 +243,26 @@ def responder_pergunta(pergunta, retriever, llm):
     global PASTA_TO_CHUNKS
     
     nome_pessoa = None
-    match = re.search(r'(?:da|de|do|d[ae])\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)', pergunta, re.IGNORECASE)
+    # Melhorada a regex para extração de nomes (mais flexível)
+    match = re.search(r'(?:da|de|do|d[ae])?\s*([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)', pergunta)
     if match:
         nome_pessoa = match.group(1).strip()
+
+    # Procura também por anos na pergunta (ex: 2025, 2026/2027)
+    anos_na_pergunta = re.findall(r'\b(20\d{2}(?:/\d{2,4})?)\b', pergunta)
+
+    # se escrever com minusculas, o sistema procura o nome na lista de pastas que já conhece
     if not nome_pessoa:
-        match = re.search(r'([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){1,2})', pergunta)
-        if match:
-            nome_pessoa = match.group(1).strip()
-            
+        pergunta_lower = pergunta.lower()
+        for pasta in PASTA_TO_CHUNKS.keys():
+            if pasta.startswith("Contrato_"):
+                nome_docente_pasta = pasta.replace("Contrato_", "").replace("_", " ").lower()
+                if nome_docente_pasta and nome_docente_pasta in pergunta_lower:
+                    nome_pessoa = pasta.replace("Contrato_", "").replace("_", " ")
+                    break
+
     print(f"[DEBUG] Nome extraído: {nome_pessoa}")
+    print(f"[DEBUG] Anos extraídos: {anos_na_pergunta}")
     
     info_bd = ""
     if nome_pessoa:
@@ -256,11 +287,13 @@ def responder_pergunta(pergunta, retriever, llm):
     
     pasta_forcada = None
     if nome_pessoa:
-        pasta_esperada = f"Contrato_{nome_pessoa.replace(' ', '_')}"
+        # Normalização do nome para procura de pasta
+        nome_normalizado = nome_pessoa.replace(' ', '_').lower()
         for pasta in PASTA_TO_CHUNKS.keys():
-            if pasta_esperada.lower() in pasta.lower() or nome_pessoa.lower() in pasta.lower():
+            if nome_normalizado in pasta.lower():
                 pasta_forcada = pasta
                 break
+        
         if pasta_forcada:
             chunks_adicionais = PASTA_TO_CHUNKS[pasta_forcada]
             existing = {(d.page_content, d.metadata.get('source')) for d in docs_rel}
@@ -273,16 +306,24 @@ def responder_pergunta(pergunta, retriever, llm):
     if not docs_rel and not info_bd:
         return "Não encontrei documentos ou registos na base de dados sobre isso.", ""
     
+    # Ordenação inteligente: Prioriza pasta forçada E depois ordena por período (mais recente primeiro ou por relevância)
     if pasta_forcada:
-        docs_rel = sorted(docs_rel, key=lambda d: 0 if d.metadata.get('pasta') == pasta_forcada else 1)
+        # Coloca documentos da pasta forçada no topo, mas mantém a diversidade de períodos
+        docs_rel = sorted(docs_rel, key=lambda d: (
+            0 if d.metadata.get('pasta') == pasta_forcada else 1,
+            -int(re.search(r'\d+', d.metadata.get('periodo', '0')).group()) if re.search(r'\d+', d.metadata.get('periodo', '')) else 0
+        ))
     
-    docs_rel = docs_rel[:8]
+    # Aumentado o limite de documentos para o contexto da LLM para capturar múltiplos períodos
+    docs_rel = docs_rel[:10]
     
     contexto_parts = []
     for i, d in enumerate(docs_rel, 1):
         fonte = d.metadata.get('source', '?')
+        pasta = d.metadata.get('pasta', 'Geral')
+        periodo = d.metadata.get('periodo', 'Desconhecido')
         conteudo = d.page_content
-        contexto_parts.append(f"[Documento: {fonte}]\n{conteudo}\n")
+        contexto_parts.append(f"[Ficheiro: {fonte} | Pasta: {pasta} | Período: {periodo}]\n{conteudo}\n")
     contexto = "\n".join(contexto_parts)
     
     conhecimento_sistema = ""
@@ -293,22 +334,34 @@ def responder_pergunta(pergunta, retriever, llm):
     if not conhecimento_sistema:
         conhecimento_sistema = "Não possuis qualquer informação no momento sobre este assunto."
 
-    instrucao = ""
+    instrucao_adicional = ""
     if pasta_forcada:
-        instrucao = f"Se a pergunta exigir analisar documentos, foca-te na informação da pasta '{pasta_forcada}'."
+        instrucao_adicional = f"Foca-te prioritariamente na informação da pasta '{pasta_forcada}' para responder a esta pergunta."
+    
+    if anos_na_pergunta:
+        instrucao_adicional += f" Presta especial atenção aos dados referentes ao(s) ano(s)/período(s): {', '.join(anos_na_pergunta)}."
 
     prompt = f"""<|im_start|>system
 És o Gest.AI, um assistente inteligente de recursos humanos e gestão académica.
 A tua missão é responder à pergunta do utilizador de forma natural, direta e prestável.
 
 Abaixo está a tua base de conhecimento atual sobre este caso. Usa APENAS esta informação para responder. 
-Age como se este conhecimento fosse teu. Não uses frases robóticas como "De acordo com os documentos" ou "A base de dados diz". Assume os factos com naturalidade.
+
+REGRA DE OURO: Age como se este conhecimento fosse teu. Não uses frases robóticas como "De acordo com os documentos" ou "A base de dados diz", EXCETO se o utilizador te perguntar especificamente "De onde tiraste essa informação?", "Qual é o ficheiro?" ou "Qual a fonte?". Nesses casos, podes referir os nomes dos ficheiros e pastas indicados no conhecimento.
+
+REGRA 1: Se a resposta não estiver no contexto, responde "Não encontrei informação sobre isso nos documentos." NUNCA inventes dados.
+REGRA 2: Sempre que justificares uma resposta com base nos documentos, DEVES citar o nome do ficheiro que usaste (ex: "Segundo o ficheiro X.docx...").
+REGRA 3: Sê direto e profissional.
+REGRA 4: Se a informação vier de um "[Registo do Sistema Central...]", deves dizer que verificaste na "base de dados do sistema" ou na "ficha de docente" e NUNCA num ficheiro.
+REGRA 5: Se a informação vier de um "[Ficheiro: ...]", podes e deves referir o nome desse documento/ficheiro.
+
+REGRA DE HISTÓRICO: O utilizador valoriza muito a precisão cronológica. Se houver dados diferentes para anos letivos diferentes (ex: 2025/2026 vs 2026/2027), DEVES distinguir claramente as situações na tua resposta. Se o utilizador não especificar o ano, apresenta a informação de forma estruturada por período.
 
 [INÍCIO DO CONHECIMENTO]
 {conhecimento_sistema}
 [FIM DO CONHECIMENTO]
 
-{instrucao}
+{instrucao_adicional}
 <|im_end|>
 <|im_start|>user
 {pergunta}
@@ -316,22 +369,24 @@ Age como se este conhecimento fosse teu. Não uses frases robóticas como "De ac
 <|im_start|>assistant
 """
     
-    # --- NOVA GERAÇÃO DE TEXTO DO LlamaCpp ---
     try:
         resposta_raw = llm(
             prompt,
-            max_tokens=512,
-            temperature=0.1,      # Temperatura super baixa para dados fiáveis
-            stop=["<|im_end|>"]   # Diz ao modelo quando a resposta acabou
+            max_tokens=768,       # Aumentado para permitir respostas mais detalhadas sobre múltiplos períodos
+            temperature=0.1,
+            stop=["<|im_end|>"]
         )
         resposta = resposta_raw["choices"][0]["text"].strip()
     except Exception as e:
         return f"Erro ao gerar resposta da IA: {e}", ""
     
-    if pasta_forcada and "rascunho" not in resposta.lower() and "incompleto" not in resposta.lower():
-        docs_filtrados = [d for d in docs_rel if d.metadata.get('pasta') == pasta_forcada]
-        if docs_filtrados:
-            melhor_fonte = docs_filtrados[0].metadata.get('source', '?')
-            resposta += f"\n\n*(Fonte: {melhor_fonte})*"
+    # Adição de fontes usadas de forma mais abrangente
+    if pasta_forcada:
+        docs_da_pasta = [d for d in docs_rel if d.metadata.get('pasta') == pasta_forcada]
+        if docs_da_pasta:
+            fontes_usadas = list(set([d.metadata.get('source', '?') for d in docs_da_pasta]))
+            fontes_str = ", ".join(fontes_usadas)
+            if not f"*(Fonte: {fontes_str})*" in resposta:
+                resposta += f"\n\n*(Fonte: {fontes_str})*"
             
     return resposta, contexto

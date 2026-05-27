@@ -315,12 +315,38 @@ def index():
         if cat not in documentos_agrupados: documentos_agrupados[cat] = {}
         if cat in ['gerado', 'processamento']:
             partes = doc['caminho'].split('/')
-            caso = partes[-2].replace('_', ' ') if len(partes) >= 4 else "Documentos Gerais"
-            if caso not in documentos_agrupados[cat]: documentos_agrupados[cat][caso] = []
-            documentos_agrupados[cat][caso].append(doc)
+            # Para documentos com estrutura: Modelos Contratuais/Modelos Gerados/Contrato_Name/[AnoLetivo/][AnoLetivo/]ficheiro
+            if len(partes) >= 4 and len(partes) > 2 and 'Modelos Gerados' in doc['caminho']:
+                # Nome do contrato está sempre em partes[2] (após Modelos Contratuais/Modelos Gerados)
+                nome_contrato = partes[2].replace('_', ' ')
+                
+                # Para o "ano_pasta", usamos tudo entre o contrato e o ficheiro
+                if len(partes) == 4:
+                    # Estrutura simples: Modelos Contratuais/Modelos Gerados/Contrato/ficheiro
+                    ano_pasta = "Ficheiros"
+                elif len(partes) == 5:
+                    # Estrutura: Modelos Contratuais/Modelos Gerados/Contrato/Ano/ficheiro
+                    ano_pasta = partes[-2]
+                else:
+                    # Estrutura complexa: Modelos Contratuais/Modelos Gerados/Contrato/Ano1/Ano2/ficheiro
+                    # Combinamos os níveis entre contrato e ficheiro
+                    subpastas = '/'.join(partes[3:-1])
+                    ano_pasta = subpastas
+                
+                # Inicializa o dicionário do contrato se não existir
+                if nome_contrato not in documentos_agrupados[cat]:
+                    documentos_agrupados[cat][nome_contrato] = {}
+                
+                # Inicializa a lista de documentos para este ano/período se não existir
+                if ano_pasta not in documentos_agrupados[cat][nome_contrato]:
+                    documentos_agrupados[cat][nome_contrato][ano_pasta] = []
+                
+                documentos_agrupados[cat][nome_contrato][ano_pasta].append(doc)
         else:
-            if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = []
-            documentos_agrupados[cat]['Geral'].append(doc)
+            if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = {}
+            if 'Ficheiros' not in documentos_agrupados[cat]['Geral']:
+                documentos_agrupados[cat]['Geral']['Ficheiros'] = []
+            documentos_agrupados[cat]['Geral']['Ficheiros'].append(doc)
     
     documentos_agrupados = {k: v for k, v in documentos_agrupados.items() if v}
     return render_template('index.html', documentos_agrupados=documentos_agrupados)

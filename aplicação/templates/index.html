@@ -147,9 +147,9 @@
           <div class="doc-category">
             <h3 style="text-transform: capitalize;">{{ categoria.replace('_', ' ') }}</h3>
             
-            {% for caso, docs in casos.items() %}
+            {% for caso, subpastas in casos.items() %}
               <div style="margin-top: 15px;">
-                <!-- Cabeçalho da Pasta Clicável -->
+                <!-- Cabeçalho da Pasta Principal (Contrato) Clicável -->
                 <div class="folder-header-container">
                   <div class="folder-header" onclick="toggleFolder(this.parentElement.nextElementSibling)">
                     <span class="folder-arrow">▼</span>
@@ -160,18 +160,33 @@
                   </div>
                 </div>
                 
-                <!-- Conteúdo da Pasta (Ficheiros) -->
+                <!-- Conteúdo da Pasta Principal (Subpastas/Anos Letivos) -->
                 <div class="folder-content" style="display: block;">
-                  {% for doc in docs %}
-                    <div class="doc-item-container">
-                      <div class="doc-item-info">
-                        <span>📄</span>
-                        <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
-                        <span class="doc-item-date">({{ doc.data_upload.strftime('%Y-%m-%d') }})</span>
+                  {% for subpasta, docs in subpastas.items() %}
+                    <div style="margin-bottom: 15px;">
+                      <!-- Cabeçalho da Subpasta (Ano Letivo) -->
+                      <div class="folder-header-container" style="margin-left: 0;">
+                        <div class="folder-header" onclick="toggleFolder(this.parentElement.nextElementSibling)" style="padding-left: 0;">
+                          <span class="folder-arrow">▼</span>
+                          <span>📅 {{ subpasta }}</span>
+                        </div>
                       </div>
-                      <div class="doc-item-actions">
-                        <button class="btn-action" onclick="abrirModalRenomear({{ doc.id }}, '{{ doc.nome }}')" title="Editar nome">✏️</button>
-                        <button class="btn-action btn-action-delete" onclick="abrirModalApagarDocumento({{ doc.id }}, '{{ doc.nome }}')" title="Apagar">✕</button>
+                      
+                      <!-- Conteúdo da Subpasta (Ficheiros) -->
+                      <div class="folder-content" style="display: block; margin-left: 0;">
+                        {% for doc in docs %}
+                          <div class="doc-item-container">
+                            <div class="doc-item-info">
+                              <span>📄</span>
+                              <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
+                              <span class="doc-item-date">({{ doc.data_upload.strftime('%Y-%m-%d') }})</span>
+                            </div>
+                            <div class="doc-item-actions">
+                              <button class="btn-action" onclick="abrirModalRenomear({{ doc.id }}, '{{ doc.nome }}')" title="Editar nome">✏️</button>
+                              <button class="btn-action btn-action-delete" onclick="abrirModalApagarDocumento({{ doc.id }}, '{{ doc.nome }}')" title="Apagar">✕</button>
+                            </div>
+                          </div>
+                        {% endfor %}
                       </div>
                     </div>
                   {% endfor %}
