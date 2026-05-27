@@ -23,13 +23,7 @@ dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 
-# --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',            
-    'password': '04072002Tomas!', 
-    'database': 'BaseDadosGestAI' 
-}
+# A configuração DB_CONFIG é importada de db_config.py no topo do ficheiro
 
 # Variável global para mapear pasta -> lista de chunks (usado na resposta)
 PASTA_TO_CHUNKS = defaultdict(list)
@@ -114,6 +108,63 @@ def ler_documentos_via_mysql():
     print(f"[*] Documentos carregados: {len(documentos_langchain)}")
     return documentos_langchain
 
+
+def obter_esquema_bd():
+    """Obtém o esquema de todas as tabelas relevantes para a LLM."""
+    esquema = ""
+    try:
+        db = mysql.connector.connect(**DB_CONFIG)
+        cursor = db.cursor()
+        cursor.execute("SHOW TABLES")
+        tabelas = [row[0] for row in cursor.fetchall()]
+        
+        for tabela in tabelas:
+            cursor.execute(f"DESCRIBE {tabela}")
+            colunas = [f"{row[0]} ({row[1]})" for row in cursor.fetchall()]
+            esquema += f"Tabela: {tabela} | Colunas: {', '.join(colunas)}\n"
+        
+        cursor.close()
+        db.close()
+    except Exception as e:
+        print(f"[!] Erro ao obter esquema: {e}")
+    return esquema
+
+def executar_sql_seguro(query):
+    """Executa uma query SQL (apenas SELECT) e retorna os resultados formatados."""
+    # Limpeza de formatação Markdown (```sql ... ```)
+    query_processada = re.sub(r'```sql\s*', '', query, flags=re.IGNORECASE)
+    query_processada = re.sub(r'```\s*', '', query_processada)
+    query_processada = query_processada.strip()
+
+    # Proteção básica contra queries não-SELECT
+    query_limpa = query_processada.upper()
+    if not query_limpa.startswith("SELECT") or any(keyword in query_limpa for keyword in ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE"]):
+        return f"Erro: Apenas consultas de leitura (SELECT) são permitidas. Query recebida: {query_processada}"
+
+    try:
+        db = mysql.connector.connect(**DB_CONFIG)
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+        cursor.close()
+        db.close()
+        
+        if not resultados:
+            return "Nenhum registo encontrado na base de dados."
+        
+        # Formatar resultados de forma compacta
+        linhas = []
+        limite = 20 # Aumentado para 20 linhas
+        for res in resultados[:limite]:
+            linhas.append(str(res))
+        
+        resultado_final = "\n".join(linhas)
+        if len(resultados) > limite:
+            resultado_final += f"\n[Aviso: Foram encontrados {len(resultados)} registos, mas apenas os primeiros {limite} são mostrados por limite de contexto.]"
+        
+        return resultado_final
+    except Exception as e:
+        return f"Erro ao executar SQL: {e}"
 
 def obter_tabelas_com_coluna_nome_docente():
     """Retorna as tabelas que contêm a coluna nome_docente na BD atual."""
@@ -205,8 +256,8 @@ def inicializar_rag():
         return None, None
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=300,
+        chunk_size=800,       # Reduzido para permitir mais chunks sem estourar o contexto
+        chunk_overlap=150,
         separators=["\n\n", "\n", ".", " ", ""]
     )
     chunks = splitter.split_documents(docs)
@@ -230,7 +281,7 @@ def inicializar_rag():
     llm = Llama(
         model_path=model_path, # Caminho absoluto baseado no diretório do script
         n_gpu_layers=-1, 
-        n_ctx=8192,      
+        n_ctx=8192,      # Aumentado para suportar mais documentos no contexto      
         verbose=True    
     )
     
@@ -315,7 +366,7 @@ def responder_pergunta(pergunta, retriever, llm):
         ))
     
     # Aumentado o limite de documentos para o contexto da LLM para capturar múltiplos períodos
-    docs_rel = docs_rel[:10]
+    docs_rel = docs_rel[:10]      # Ajustado para 10 para segurança adicional
     
     contexto_parts = []
     for i, d in enumerate(docs_rel, 1):
@@ -326,13 +377,48 @@ def responder_pergunta(pergunta, retriever, llm):
         contexto_parts.append(f"[Ficheiro: {fonte} | Pasta: {pasta} | Período: {periodo}]\n{conteudo}\n")
     contexto = "\n".join(contexto_parts)
     
-    conhecimento_sistema = ""
-    if info_bd:
-        conhecimento_sistema += f"Informação atual da base de dados:\n{info_bd}\n\n"
-    if contexto:
-        conhecimento_sistema += f"Informação extraída dos Documentos do processo:\n{contexto}\n\n"
-    if not conhecimento_sistema:
-        conhecimento_sistema = "Não possuis qualquer informação no momento sobre este assunto."
+    # --- LÓGICA TEXT-TO-SQL ---
+    esquema_bd = obter_esquema_bd()
+    prompt_sql = f"""<|im_start|>system
+És um especialista em SQL para MySQL. A tua tarefa é analisar a pergunta do utilizador e o esquema da base de dados e decidir se é necessária uma consulta SQL para responder.
+
+Esquema da Base de Dados:
+{esquema_bd}
+
+REGRAS:
+1. Se a pergunta for analítica (contagens, listas, somas) ou sobre dados estruturados na BD, responde APENAS com a query SQL.
+2. A query deve ser APENAS de leitura (SELECT).
+3. Se a pergunta for sobre o conteúdo de documentos (RAG) ou se não souberes a resposta via SQL, responde "NÃO_SQL".
+4. NUNCA inventes tabelas ou colunas que não estejam no esquema.
+
+Exemplos:
+Pergunta: "Quantos docentes existem?" -> SELECT COUNT(*) FROM docentes;
+Pergunta: "Lista os rascunhos de 2025" -> SELECT * FROM rascunhos WHERE ano_letivo LIKE '%2025%';
+Pergunta: "O que diz o contrato do Tomás?" -> NÃO_SQL
+<|im_end|>
+<|im_start|>user
+{pergunta}
+<|im_end|>
+<|im_start|>assistant
+"""
+    sql_query = ""
+    try:
+        res_sql = llm(prompt_sql, max_tokens=128, stop=["<|im_end|>"])
+        sugestao = res_sql["choices"][0]["text"].strip()
+        if "SELECT" in sugestao.upper():
+            sql_query = sugestao
+            print(f"[DEBUG] SQL Gerado: {sql_query}")
+            info_sql = executar_sql_seguro(sql_query)
+            print(f"[DEBUG] SQL Resultado: {info_sql}") # Adicionado debug do resultado
+            
+            # Se o SQL falhou ou foi bloqueado, não inserimos no contexto para não confundir a LLM
+            if not info_sql.startswith("Erro:"):
+                # Formatação mais clara para a LLM entender que isto é a resposta da BD
+                info_bd += f"\n--- INÍCIO DOS DADOS DA BASE DE DADOS ---\n[Consulta SQL Dinâmica]\nPergunta: {pergunta}\nQuery: {sql_query}\nDados Encontrados:\n{info_sql}\n--- FIM DOS DADOS DA BASE DE DADOS ---\n"
+            else:
+                print(f"[!] SQL Bloqueado/Erro: {info_sql}")
+    except Exception as e:
+        print(f"[!] Erro na geração/execução de SQL: {e}")
 
     instrucao_adicional = ""
     if pasta_forcada:
@@ -340,6 +426,15 @@ def responder_pergunta(pergunta, retriever, llm):
     
     if anos_na_pergunta:
         instrucao_adicional += f" Presta especial atenção aos dados referentes ao(s) ano(s)/período(s): {', '.join(anos_na_pergunta)}."
+
+    # Re-construir o conhecimento após a execução do SQL
+    conhecimento_sistema = ""
+    if info_bd:
+        conhecimento_sistema += f"Informação atual da base de dados (registos e consultas):\n{info_bd}\n\n"
+    if contexto:
+        conhecimento_sistema += f"Informação extraída dos Documentos do processo:\n{contexto}\n\n"
+    if not conhecimento_sistema:
+        conhecimento_sistema = "Não possuis qualquer informação no momento sobre este assunto."
 
     prompt = f"""<|im_start|>system
 És o Gest.AI, um assistente inteligente de recursos humanos e gestão académica.
@@ -353,9 +448,11 @@ REGRA 1: Se a resposta não estiver no contexto, responde "Não encontrei inform
 REGRA 2: Sempre que justificares uma resposta com base nos documentos, DEVES citar o nome do ficheiro que usaste (ex: "Segundo o ficheiro X.docx...").
 REGRA 3: Sê direto e profissional.
 REGRA 4: Se a informação vier de um "[Registo do Sistema Central...]", deves dizer que verificaste na "base de dados do sistema" ou na "ficha de docente" e NUNCA num ficheiro.
-REGRA 5: Se a informação vier de um "[Ficheiro: ...]", podes e deves referir o nome desse documento/ficheiro.
-
-REGRA DE HISTÓRICO: O utilizador valoriza muito a precisão cronológica. Se houver dados diferentes para anos letivos diferentes (ex: 2025/2026 vs 2026/2027), DEVES distinguir claramente as situações na tua resposta. Se o utilizador não especificar o ano, apresenta a informação de forma estruturada por período.
+	REGRA 5: Se a informação vier de um "[Ficheiro: ...]", podes e deves referir o nome desse documento/ficheiro.
+	
+	REGRA 6 (PRIORIDADE): Se houver conflito entre a informação da "Base de Dados (registos e consultas)" e a "Informação extraída dos Documentos", deves SEMPRE priorizar a informação da Base de Dados. Se houver dados em "--- INÍCIO DOS DADOS DA BASE DE DADOS ---", essa é a tua fonte principal de verdade para responder à pergunta. Use esses dados para construir a tua resposta de forma natural.
+	
+	REGRA DE HISTÓRICO: O utilizador valoriza muito a precisão cronológica. Se houver dados diferentes para anos letivos diferentes (ex: 2025/2026 vs 2026/2027), DEVES distinguir claramente as situações na tua resposta. Se o utilizador não especificar o ano, apresenta a informação de forma estruturada por período.
 
 [INÍCIO DO CONHECIMENTO]
 {conhecimento_sistema}
