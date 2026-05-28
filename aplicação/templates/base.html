@@ -8,7 +8,6 @@
   
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
   
-  <!-- SCRIPT PARA EVITAR "FLASH" BRANCO: Lê a preferência antes de carregar a página -->
   <script>
     if (localStorage.getItem('theme') === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -55,13 +54,12 @@
     .logo-container span { color: var(--primary); }
     .nav-container { display: flex; gap: 15px; align-items: center; }
     
-    .btn-nav-link { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 1rem; transition: color 0.2s; }
-    .btn-nav-link:hover { color: var(--text); }
+    .btn-nav-link { background: none; border: none; color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 1rem; transition: 0.2s; padding: 8px 12px; border-radius: 6px; font-family: 'Outfit', sans-serif; cursor: pointer; }
+    .btn-nav-link:hover { color: var(--text); background: var(--hover-bg); }
     
     .btn-rascunhos-global { display: inline-flex; align-items: center; gap: 6px; background-color: var(--btn-draft-bg); color: var(--primary); padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; transition: background 0.2s; }
     .btn-rascunhos-global:hover { filter: brightness(0.95); }
     
-    /* Botão Theme Toggle */
     .btn-theme-toggle { background: none; border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
     .btn-theme-toggle:hover { background: var(--hover-bg); }
     
@@ -69,6 +67,15 @@
     .icon-moon { display: block; }
     [data-theme="dark"] .icon-sun { display: block; }
     [data-theme="dark"] .icon-moon { display: none; }
+
+    /* --- ESTILOS DO MODAL GLOBAL DE NOVO PROCESSO --- */
+    .modal-global { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(3px); }
+    .modal-global.active { display: flex; }
+    .modal-content-global { background: var(--panel-bg); padding: 35px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px var(--shadow); color: var(--text); }
+    .modal-content-global h2 { font-family: 'DM Serif Display', serif; margin-top: 0; font-size: 1.8rem; color: var(--title-color); }
+    .btn-modal-global { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-bg); color: var(--text); text-align: left; font-size: 1.05rem; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: 'Outfit', sans-serif; }
+    .btn-modal-global:hover { border-color: var(--primary); background: var(--btn-draft-bg); color: var(--primary); transform: translateY(-2px); }
+    .btn-fechar-global { background: none; border: none; color: var(--text-muted); font-size: 0.9rem; text-decoration: underline; cursor: pointer; display: block; text-align: center; width: 100%; margin-top: 15px; font-family: 'Outfit', sans-serif; }
 
     {% block extra_css %}{% endblock %}
   </style>
@@ -79,19 +86,29 @@
       <a href="/" class="logo-container">Gest<span>.AI</span></a>
       
       <nav class="nav-container">
-          <!-- Botão Modo Escuro / Claro -->
           <button id="theme-toggle" class="btn-theme-toggle" title="Alternar Modo Escuro/Claro">
             <svg class="icon-moon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
             <svg class="icon-sun" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
           </button>
 
-          {% block nav_buttons %}
+          {% if request.path == '/' %}
+            <button class="nav-btn active" data-panel="chat" onclick="switchPanel('chat', this)">Assistente</button>
+            <button class="nav-btn" data-panel="upload" onclick="switchPanel('upload', this)">Documentos</button>
+          {% else %}
             <a href="/" class="btn-nav-link">Página Inicial</a>
-            <a href="/meus-rascunhos" class="btn-rascunhos-global">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-              Os Meus Rascunhos
-            </a>
-          {% endblock %}
+          {% endif %}
+          
+          <a href="/base-dados" class="btn-nav-link">Consulta BD</a>
+          <a href="/importar-historico" class="btn-nav-link">Importar Histórico</a>
+
+          <a href="/meus-rascunhos" class="btn-rascunhos-global">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+            Rascunhos
+          </a>
+          
+          <button onclick="document.getElementById('modal-processo-global').classList.add('active')" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-family: 'Outfit', sans-serif; transition: 0.2s;">
+            + Novo Processo
+          </button>
       </nav>
   </header>
 
@@ -99,8 +116,19 @@
       {% block content %}{% endblock %}
   </main>
 
+  <div id="modal-processo-global" class="modal-global">
+    <div class="modal-content-global">
+      <h2>Escolher Tipo de Contrato</h2>
+      <p style="color: var(--text-muted); margin-bottom: 25px;">Selecione o modelo que pretende gerar:</p>
+      <button class="btn-modal-global" onclick="window.location.href='/contratacao/renovacao-integral'">📄 Renovação - Tempo Integral</button>
+      <button class="btn-modal-global" onclick="window.location.href='/contratacao/renovacao-parcial'">📄 Renovação - Tempo Parcial</button>
+      <button class="btn-modal-global" onclick="window.location.href='/contratacao/primeira-vez'">📄 Primeira Contratação (Edital)</button>
+      <button class="btn-fechar-global" onclick="document.getElementById('modal-processo-global').classList.remove('active')">Cancelar e Voltar</button>
+    </div>
+  </div>
+
   <script>
-    // Lógica global para alternar o tema em todas as páginas
+    // Lógica global para alternar o tema
     document.getElementById('theme-toggle').addEventListener('click', () => {
       const html = document.documentElement;
       if (html.getAttribute('data-theme') === 'dark') {
@@ -111,6 +139,23 @@
         localStorage.setItem('theme', 'dark');
       }
     });
+
+    // Fechar modal global ao clicar fora dele
+    window.addEventListener('click', function(event) {
+      const modalProc = document.getElementById('modal-processo-global');
+      if (event.target === modalProc) {
+        modalProc.classList.remove('active');
+      }
+    });
+
+    // Função global para alternar painéis (Assistente vs Documentos)
+    function switchPanel(panelId, btn) {
+      document.querySelectorAll('.nav-btn[data-panel]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      if(btn) btn.classList.add('active');
+      const panel = document.getElementById(panelId);
+      if(panel) panel.classList.add('active');
+    }
   </script>
 
   {% block scripts %}{% endblock %}

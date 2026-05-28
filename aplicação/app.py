@@ -301,56 +301,50 @@ def close_connection(exception):
 def index():
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM documentos ORDER BY categoria, nome")
+    cursor.execute("SELECT * FROM documentos ORDER BY categoria, caminho")
     lista_documentos = cursor.fetchall()
     cursor.close()
     
-    documentos_agrupados = {'processamento': {}, 'gerado': {}, 'template': {}, 'pdf_llm': {}}
-    ROOT_DIR = os.path.dirname(BASE_DIR)
+    # Estrutura: documentos_agrupados[categoria][nome_contrato][subpasta_ou_files] = [lista_de_docs]
+    documentos_agrupados = {}
     
     for doc in lista_documentos:
-        caminho_absoluto = os.path.join(ROOT_DIR, doc['caminho'])
-        if not os.path.exists(caminho_absoluto): continue 
         cat = doc['categoria']
         if cat not in documentos_agrupados: documentos_agrupados[cat] = {}
-        if cat in ['gerado', 'processamento']:
-            partes = doc['caminho'].split('/')
-            # Para documentos com estrutura: Modelos Contratuais/Modelos Gerados/Contrato_Name/[AnoLetivo/][AnoLetivo/]ficheiro
-            if len(partes) >= 4 and len(partes) > 2 and 'Modelos Gerados' in doc['caminho']:
-                # Nome do contrato está sempre em partes[2] (após Modelos Contratuais/Modelos Gerados)
-                nome_contrato = partes[2].replace('_', ' ')
+        
+        # Lógica para caminhos em 'Modelos Gerados'
+        if 'Modelos Gerados' in doc['caminho']:
+            partes = doc['caminho'].replace('\\', '/').split('/')
+            
+            # Encontrar onde começa o "Contrato_"
+            idx_contrato = -1
+            for i, p in enumerate(partes):
+                if p.startswith('Contrato_'):
+                    idx_contrato = i
+                    break
+            
+            if idx_contrato != -1:
+                nome_contrato = partes[idx_contrato].replace('_', ' ')
+                # Subpastas são tudo o que está entre o contrato e o ficheiro
+                subpastas = "/".join(partes[idx_contrato+1:-1])
+                pasta_display = subpastas if subpastas else "Ficheiros"
                 
-                # Para o "ano_pasta", usamos tudo entre o contrato e o ficheiro
-                if len(partes) == 4:
-                    # Estrutura simples: Modelos Contratuais/Modelos Gerados/Contrato/ficheiro
-                    ano_pasta = "Ficheiros"
-                elif len(partes) == 5:
-                    # Estrutura: Modelos Contratuais/Modelos Gerados/Contrato/Ano/ficheiro
-                    ano_pasta = partes[-2]
-                else:
-                    # Estrutura complexa: Modelos Contratuais/Modelos Gerados/Contrato/Ano1/Ano2/ficheiro
-                    # Combinamos os níveis entre contrato e ficheiro
-                    subpastas = '/'.join(partes[3:-1])
-                    ano_pasta = subpastas
-                
-                # Inicializa o dicionário do contrato se não existir
                 if nome_contrato not in documentos_agrupados[cat]:
                     documentos_agrupados[cat][nome_contrato] = {}
+                if pasta_display not in documentos_agrupados[cat][nome_contrato]:
+                    documentos_agrupados[cat][nome_contrato][pasta_display] = []
                 
-                # Inicializa a lista de documentos para este ano/período se não existir
-                if ano_pasta not in documentos_agrupados[cat][nome_contrato]:
-                    documentos_agrupados[cat][nome_contrato][ano_pasta] = []
-                
-                documentos_agrupados[cat][nome_contrato][ano_pasta].append(doc)
+                documentos_agrupados[cat][nome_contrato][pasta_display].append(doc)
+            else:
+                # Caso de segurança se não encontrar "Contrato_"
+                if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = {'Ficheiros': []}
+                documentos_agrupados[cat]['Geral']['Ficheiros'].append(doc)
         else:
-            if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = {}
-            if 'Ficheiros' not in documentos_agrupados[cat]['Geral']:
-                documentos_agrupados[cat]['Geral']['Ficheiros'] = []
+            # Caso Geral
+            if 'Geral' not in documentos_agrupados[cat]: documentos_agrupados[cat]['Geral'] = {'Ficheiros': []}
             documentos_agrupados[cat]['Geral']['Ficheiros'].append(doc)
-    
-    documentos_agrupados = {k: v for k, v in documentos_agrupados.items() if v}
+            
     return render_template('index.html', documentos_agrupados=documentos_agrupados)
-
 
 @app.route('/contratacao/<tipo>')
 def iniciar_contratacao(tipo):
@@ -941,6 +935,136 @@ def apagar_pasta(caso):
         import traceback
         traceback.print_exc()
         return jsonify({"sucesso": False, "erro": str(e)}), 500
+        
+
+@app.route('/importar-historico')
+def importar_historico():
+    return render_template('importar.html')
+
+@app.route('/base-dados')
+def explorar_bd():
+    return render_template('base_dados.html')
+
+@app.route('/api/procurar-docente')
+def procurar_docente():
+    nome = request.args.get('q', '').strip()
+    if not nome:
+        return jsonify({"erro": "Insira um nome"}), 400
+    
+    resultado = {"docente": None, "rascunhos": [], "documentos": []}
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        
+        #1. Procurar perfil na tabela docentes
+        cursor.execute("SELECT * FROM docentes WHERE nome LIKE %s", (f"%{nome}%",))
+        docente = cursor.fetchone()
+
+        if docente:
+            #Se houver histórico guardado em JSON, converte para enviar bonito
+            if docente.get('dados_historico'):
+                docente['historico:json'] = json.loads(docente['dados_historico'])
+            resultado['docente'] = docente
+
+            #2. procurar rascunhos associados
+            cursor.execute("SELECT id, tipo_contrato, data_guardado FROM rascunhos WHERE nome_docente LIKE %s", (f"%{nome}%",))
+            resultado['rascunhos'] = cursor.fetchall()
+
+            #3. procurar documentos gerados (pela pasta Contrato_Nome)
+            nome_pasta = f"Contrato_{docente['nome'].replace(' ', '_')}"
+            cursor.execute("SELECT id, nome, categoria, data_upload, caminho FROM documentos WHERE caminho LIKE %s", (f"%{nome_pasta}%",))
+            resultado['documentos'] = cursor.fetchall()
+
+        cursor.close()
+        return jsonify(resultado)
+    except Exception as e:
+        print(f"[!] Erro na pesquisa: {e}")
+        return jsonify({"erro": str(e)}), 500
+    
+
+@app.route('/api/lista-tabelas')
+def lista_tabelas():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SHOW TABLES")
+        # O cursor devolve tuplos como [('docentes',), ('contratos',)], transformamos numa lista simples
+        tabelas = [t[0] for t in cursor.fetchall()]
+        cursor.close()
+        return jsonify({"tabelas": tabelas})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/dados-tabela/<table_name>')
+def dados_tabela(table_name):
+    try:
+        db = get_db()
+        # Verificação de segurança dinâmica: a tabela existe realmente na BD?
+        cursor = db.cursor()
+        cursor.execute("SHOW TABLES")
+        tabelas_existentes = [t[0] for t in cursor.fetchall()]
+        cursor.close()
+
+        if table_name not in tabelas_existentes:
+            return jsonify({"erro": "Tabela não encontrada"}), 404
+        
+        # Agora sim, fazemos a consulta
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 100")
+        dados = cursor.fetchall()
+        cursor.close()
+        return jsonify({"dados": dados})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    
+@app.route('/api/update-cell', methods=['POST'])
+def update_cell():
+    data = request.json
+    table = data.get('table')
+    coluna = data.get('column')
+    valor = data.get('value')
+    # O identificador é sempre a primeira coluna da tabela (assumindo que é a PK)
+    id_col = data.get('id_col') 
+    id_val = data.get('id_val')
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        # Query parametrizada para evitar SQL Injection
+        query = f"UPDATE `{table}` SET `{coluna}` = %s WHERE `{id_col}` = %s"
+        cursor.execute(query, (valor, id_val))
+        db.commit()
+        cursor.close()
+        return jsonify({"status": "sucesso"})
+    except Exception as e:
+        return jsonify({"status": "erro", "message": str(e)}), 500
+    
+@app.route('/api/adicionar-linha', methods=['POST'])
+def adicionar_linha():
+    data = request.json
+    table = data.get('table')
+    # Validar se a tabela existe
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(f"INSERT INTO `{table}` () VALUES ()") # Cria uma linha com valores default
+    db.commit()
+    cursor.close()
+    return jsonify({"status": "sucesso"})
+
+@app.route('/api/apagar-linha', methods=['POST'])
+def apagar_linha():
+    data = request.json
+    table = data.get('table')
+    id_col = data.get('id_col')
+    id_val = data.get('id_val')
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(f"DELETE FROM `{table}` WHERE `{id_col}` = %s", (id_val,))
+    db.commit()
+    cursor.close()
+    return jsonify({"status": "sucesso"})
 
 @app.route('/api/renomear-documento/<int:doc_id>', methods=['POST'])
 def renomear_documento(doc_id):

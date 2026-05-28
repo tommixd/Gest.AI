@@ -280,3 +280,15 @@ main {
   pointer-events: none; z-index: 100;
 }
 #toast.show { opacity: 1; transform: translateY(0); }
+
+
+/* Esconder botões de ação por defeito */
+.edit-only { display: none !important; }
+
+/* Quando o modo edição está ativo, mostramos os botões */
+body.edit-mode .edit-only { display: inline-block !important; }
+body.edit-mode .view-only { display: none !important; }
+
+/* Estilo iPhone-like para os botões */
+.btn-delete-row { background: #ff3b30; color: white; border-radius: 50%; width: 24px; height: 24px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.btn-add-row { background: #34c759; color: white; border-radius: 50%; width: 24px; height: 24px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }

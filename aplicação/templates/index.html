@@ -104,20 +104,9 @@
   .btn-cancelar:hover { background: var(--hover-bg); }
 {% endblock %}
 
-{% block nav_buttons %}
-  <button class="nav-btn active" data-panel="chat">Assistente</button>
-  <button class="nav-btn" data-panel="upload">Documentos</button>
-  <a href="/meus-rascunhos" class="btn-rascunhos-global">
-    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-    Rascunhos
-  </a>
-  <button id="btn-novo-processo" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-family: 'Outfit', sans-serif; transition: 0.2s;">
-    + Novo Processo
-  </button>
-{% endblock %}
+
 
 {% block content %}
-  <!-- PAINEL 1: ASSISTENTE (CHAT) -->
   <div id="chat" class="panel active">
     <div class="chat-container">
       <div class="chat-box" id="chat-box">
@@ -130,56 +119,45 @@
     </div>
   </div>
 
-  <!-- PAINEL 2: DOCUMENTOS E BASE DE DADOS -->
   <div id="upload" class="panel">
-    <div class="upload-area" onclick="document.getElementById('file-input').click()">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-      <h3 style="margin: 0; color: var(--text);">Arraste ficheiros ou clique para escolher</h3>
-      <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Apenas para análise temporária da IA</p>
-      <input type="file" id="file-input" style="display: none;" multiple>
-    </div>
-
-    <!-- Secção da Base de Dados -->
     <div class="database-section">
       <h2 class="database-title">Base de Dados (Arquivo)</h2>
-      {% if documentos_agrupados %}
-        {% for categoria, casos in documentos_agrupados.items() %}
-          <div class="doc-category">
-            <h3 style="text-transform: capitalize;">{{ categoria.replace('_', ' ') }}</h3>
-            
-            {% for caso, subpastas in casos.items() %}
-              <div style="margin-top: 15px;">
-                <!-- Cabeçalho da Pasta Principal (Contrato) Clicável -->
-                <div class="folder-header-container">
-                  <div class="folder-header" onclick="toggleFolder(this.parentElement.nextElementSibling)">
-                    <span class="folder-arrow">▼</span>
-                    <span>📁 {{ caso }}</span>
-                  </div>
-                  <div class="folder-actions">
-                    <button class="btn-action btn-action-delete" onclick="abrirModalApagarPasta('{{ caso }}')" title="Apagar pasta">🗑️</button>
-                  </div>
-                </div>
-                
-                <!-- Conteúdo da Pasta Principal (Subpastas/Anos Letivos) -->
-                <div class="folder-content" style="display: block;">
-                  {% for subpasta, docs in subpastas.items() %}
-                    <div style="margin-bottom: 15px;">
-                      <!-- Cabeçalho da Subpasta (Ano Letivo) -->
-                      <div class="folder-header-container" style="margin-left: 0;">
-                        <div class="folder-header" onclick="toggleFolder(this.parentElement.nextElementSibling)" style="padding-left: 0;">
-                          <span class="folder-arrow">▼</span>
-                          <span>📅 {{ subpasta }}</span>
+      {% for categoria, contratos in documentos_agrupados.items() %}
+        <div class="doc-category">
+          <h3 style="text-transform: capitalize;">{{ categoria.replace('_', ' ') }}</h3>
+          
+          {% for nome_contrato, pastas in contratos.items() %}
+            <div style="margin-top: 15px;">
+              <div class="folder-header" onclick="toggleFolder(this.parentElement.querySelector('.contrato-content'))">
+                <span class="folder-arrow">▼</span>
+                <span>📁 {{ nome_contrato }}</span>
+              </div>
+              
+              <div class="contrato-content folder-content" style="display: block;">
+                {% for nome_pasta, docs in pastas.items() %}
+                  {% if nome_pasta == 'Ficheiros' %}
+                    {% for doc in docs %}
+                      <div class="doc-item-container">
+                        <div class="doc-item-info">
+                          <span>📄</span>
+                          <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
+                          <span class="doc-item-date">({{ (doc.data_upload | string)[:10] }})</span>
                         </div>
                       </div>
-                      
-                      <!-- Conteúdo da Subpasta (Ficheiros) -->
-                      <div class="folder-content" style="display: block; margin-left: 0;">
+                    {% endfor %}
+                  {% else %}
+                    <div style="margin-top: 10px; margin-left: 10px;">
+                      <div class="folder-header" onclick="toggleFolder(this.parentElement.querySelector('.sub-content'))" style="font-size: 0.9em;">
+                        <span class="folder-arrow">▼</span>
+                        <span>📂 {{ nome_pasta }}</span>
+                      </div>
+                      <div class="sub-content folder-content">
                         {% for doc in docs %}
                           <div class="doc-item-container">
                             <div class="doc-item-info">
                               <span>📄</span>
                               <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
-                              <span class="doc-item-date">({{ doc.data_upload.strftime('%Y-%m-%d') }})</span>
+                              <span class="doc-item-date">({{ (doc.data_upload | string)[:10] }})</span>
                             </div>
                             <div class="doc-item-actions">
                               <button class="btn-action" onclick="abrirModalRenomear({{ doc.id }}, '{{ doc.nome }}')" title="Editar nome">✏️</button>
@@ -189,20 +167,16 @@
                         {% endfor %}
                       </div>
                     </div>
-                  {% endfor %}
-                </div>
+                  {% endif %}
+                {% endfor %}
               </div>
-            {% endfor %}
-            
-          </div>
-        {% endfor %}
-      {% else %}
-        <p style="color: var(--text-muted);">A base de dados encontra-se vazia.</p>
-      {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
     </div>
   </div>
 
-  <!-- MODAL: NOVO PROCESSO -->
   <div id="modal-processo" class="modal">
     <div class="modal-content">
       <h2>Escolher Tipo de Contrato</h2>
@@ -214,7 +188,6 @@
     </div>
   </div>
 
-  <!-- MODAL: RENOMEAR DOCUMENTO -->
   <div id="modal-rename-doc" class="modal-rename">
     <div class="modal-rename-content">
       <h3>Renomear Documento</h3>
@@ -226,7 +199,6 @@
     </div>
   </div>
 
-  <!-- MODAL: CONFIRMAÇÃO DE APAGAR -->
   <div id="modal-confirmacao-doc" class="modal-confirmacao">
     <div class="modal-confirmacao-content">
       <h3 id="modal-titulo-doc">Confirmar Eliminação</h3>
@@ -268,7 +240,6 @@
   const modal = document.getElementById('modal-processo');
   document.getElementById('btn-novo-processo').addEventListener('click', () => modal.classList.add('active'));
   function fecharModal() { modal.classList.remove('active'); }
-  window.onclick = function(event) { if (event.target == modal) fecharModal(); }
 
   // Script do Chatbox
   async function enviarMensagem() {
@@ -309,49 +280,6 @@
   }
 
   function handleKeyPress(e) { if (e.key === 'Enter') enviarMensagem(); }
-
-  // Lógica de Upload de Ficheiros
-  const fileInput = document.getElementById('file-input');
-  
-  fileInput.addEventListener('change', async function() {
-    if (this.files.length === 0) return;
-    
-    // Preparar os dados para envio
-    const formData = new FormData();
-    for (let i = 0; i < this.files.length; i++) {
-      formData.append('file', this.files[i]);
-    }
-    
-    // Feedback visual na UI
-    const titleArea = document.querySelector('.upload-area h3');
-    const textoOriginal = titleArea.innerText;
-    titleArea.innerText = "A carregar ficheiro(s)...";
-    titleArea.style.color = "var(--primary)";
-    
-    try {
-      const response = await fetch('/upload-documento', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        // Recarrega a página para o documento aparecer na listagem da BD
-        window.location.reload(); 
-      } else {
-        alert("Erro: " + result.erro);
-      }
-    } catch (error) {
-      console.error("Erro no fetch do upload:", error);
-      alert("Ocorreu um erro ao comunicar com o servidor.");
-    } finally {
-      // Repor o estado original
-      titleArea.innerText = textoOriginal;
-      titleArea.style.color = "var(--text)";
-      this.value = ''; // Limpar o input
-    }
-  });
 
   // --- FUNÇÕES PARA APAGAR DOCUMENTOS E PASTAS ---
   let tipoApagarDoc = null; // 'documento' ou 'pasta'
@@ -456,14 +384,11 @@
       const response = await fetch(url, { method: 'DELETE' });
       const data = await response.json();
 
-      console.log('Resposta do servidor:', data);
-
       if (data.sucesso) {
         alert('✅ Documento/Pasta apagado(a) com sucesso!');
-        location.reload(); // Recarregar página
+        location.reload(); 
       } else {
         alert('❌ Erro: ' + (data.erro || 'Não foi possível apagar.'));
-        console.error('Erro completo:', data);
       }
     } catch (error) {
       console.error('Erro de rede:', error);

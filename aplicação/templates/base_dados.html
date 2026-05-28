@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Consulta BD - Gest.AI{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilo do botão de modo edição */
+    .btn-edit-mode { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; transition: 0.2s; }
+    body.edit-mode .btn-edit-mode { background: var(--primary); color: white; }
+
+    /* Esconder botões de ação por defeito */
+    .edit-only { display: none !important; }
+    /* Quando o modo edição está ativo, mostramos os botões */
+    body.edit-mode .edit-only { display: inline-flex !important; }
+    
+    /* Estilo botões iOS */
+    .btn-delete-row { background: #ff3b30; color: white; border-radius: 50%; width: 24px; height: 24px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-add-row { background: #34c759; color: white; padding: 5px 15px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 40px auto; padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1 style="font-family: 'DM Serif Display'; margin: 0;">Explorador de Base de Dados</h1>
+        <button id="edit-toggle-btn" class="btn-edit-mode" onclick="toggleEditMode()">Editar</button>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <select id="select-tabelas" onchange="carregarTabela()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+            <option value="">-- Escolha uma tabela --</option>
+        </select>
+        
+        <div class="edit-only" style="margin-top: 15px;">
+            <button class="btn-add-row" onclick="adicionarLinha()">+ Adicionar Nova Linha</button>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border);">
+        <table id="tabela-dados" style="width: 100%; border-collapse: collapse;">
+            <thead id="tabela-head" style="background: var(--hover-bg);"></thead>
+            <tbody id="tabela-body"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 1. Carregar lista de tabelas
+    window.onload = async () => {
+        const res = await fetch('/api/lista-tabelas');
+        const data = await res.json();
+        const select = document.getElementById('select-tabelas');
+        data.tabelas.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t.toUpperCase();
+            select.appendChild(opt);
+        });
+    };
+
+    // 2. Modo Edição (Toggle)
+    function toggleEditMode() {
+        document.body.classList.toggle('edit-mode');
+        const btn = document.getElementById('edit-toggle-btn');
+        btn.textContent = document.body.classList.contains('edit-mode') ? "Concluir" : "Editar";
+    }
+
+    // 3. Carregar dados da tabela
+    async function carregarTabela() {
+        const table = document.getElementById('select-tabelas').value;
+        if (!table) return;
+
+        const res = await fetch(`/api/dados-tabela/${table}`);
+        const data = await res.json();
+        
+        const thead = document.getElementById('tabela-head');
+        const tbody = document.getElementById('tabela-body');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        if (data.dados && data.dados.length > 0) {
+            const headers = Object.keys(data.dados[0]);
+            const pk_col = headers[0];
+
+            const trHead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.style.padding = '15px';
+                th.textContent = h;
+                trHead.appendChild(th);
+            });
+            // Coluna ações
+            const thAction = document.createElement('th');
+            thAction.textContent = 'Ações';
+            trHead.appendChild(thAction);
+            thead.appendChild(trHead);
+
+            data.dados.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    td.style.padding = '15px';
+                    td.textContent = row[h];
+                    if (h !== pk_col) {
+                        td.contentEditable = "true";
+                        td.onblur = function() { saveCell(table, pk_col, row[pk_col], h, this.textContent); };
+                    }
+                    tr.appendChild(td);
+                });
+                
+                // Botão Apagar (edit-only)
+                const tdAction = document.createElement('td');
+                tdAction.innerHTML = `<button class="edit-only btn-delete-row" onclick="apagarLinha('${table}', '${pk_col}', '${row[pk_col]}')">-</button>`;
+                tr.appendChild(tdAction);
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    // 4. Funções de CRUD
+    async function adicionarLinha() {
+        const table = document.getElementById('select-tabelas').value;
+        await fetch('/api/adicionar-linha', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({table})
+        });
+        carregarTabela();
+    }
+
+    async function apagarLinha(table, id_col, id_val) {
+        if (!confirm("Apagar esta linha?")) return;
+        await fetch('/api/apagar-linha', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({table, id_col, id_val})
+        });
+        carregarTabela();
+    }
+
+    async function saveCell(table, id_col, id_val, col, val) {
+        await fetch('/api/update-cell', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({table, id_col, id_val, column: col, value: val})
+        });
+    }
+</script>
+{% endblock %}

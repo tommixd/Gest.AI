@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Importar Histórico - Gest.AI{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 40px auto;">
+    <h1 style="font-family: 'DM Serif Display';">Importar Arquivo</h1>
+    <p style="color: var(--text-muted); margin-bottom: 30px;">
+        Use esta área para carregar processos antigos em PDF/Word. O sistema irá extrair os dados e povoar a base de dados central.
+    </p>
+
+    <div class="upload-area" onclick="document.getElementById('file-input').click()" style="border: 2px dashed var(--primary); padding: 50px; text-align: center; border-radius: 12px; cursor: pointer; background: var(--panel-bg);">
+      <h3 style="margin: 0; color: var(--text);">Arraste ficheiros de processos antigos</h3>
+      <input type="file" id="file-input" style="display: none;" multiple>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}
