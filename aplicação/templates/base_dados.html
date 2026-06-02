@@ -16,27 +16,69 @@
     /* Estilo botões iOS */
     .btn-delete-row { background: #ff3b30; color: white; border-radius: 50%; width: 24px; height: 24px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .btn-add-row { background: #34c759; color: white; padding: 5px 15px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+
+    .btn-ui { 
+        background: var(--primary); 
+        color: white; 
+        border: none; 
+        padding: 8px 16px; 
+        border-radius: 6px; 
+        font-weight: 600; 
+        cursor: pointer; 
+        font-family: 'Outfit', sans-serif; 
+        transition: 0.2s; 
+    }
+    .btn-ui:hover { background: var(--primary-hover); }
+    
+    /* Estado de Edição (Concluir) */
+    body.edit-mode .btn-ui { background: #e74c3c; } /* Vermelho para modo edição */
+
+    /* Efeito de hover nas linhas da tabela */
+    #tabela-dados tbody tr { transition: background 0.2s; }
+    #tabela-dados tbody tr:hover { background: var(--hover-bg); }
+
+    /* Células editáveis ganham destaque no Modo Edição */
+    body.edit-mode .editable-cell { 
+        background: rgba(26, 115, 232, 0.05); 
+        cursor: text; 
+        border-left: 1px solid transparent;
+        border-right: 1px solid transparent;
+    }
+    body.edit-mode .editable-cell:hover { background: rgba(26, 115, 232, 0.1); }
+    body.edit-mode .editable-cell:focus { 
+        outline: none; 
+        background: var(--panel-bg); 
+        box-shadow: inset 0 0 0 2px var(--primary); 
+        border-radius: 4px;
+    }
+    
+    /* Esconder colunas inteiras (cabeçalho e células) */
+    .edit-only { display: none !important; }
+    body.edit-mode .edit-only { display: table-cell !important; } /* Mudou de inline-flex para table-cell */
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 1200px; margin: 40px auto; padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <h1 style="font-family: 'DM Serif Display'; margin: 0;">Explorador de Base de Dados</h1>
-        <button id="edit-toggle-btn" class="btn-edit-mode" onclick="toggleEditMode()">Editar</button>
-    </div>
     
-    <div style="margin-bottom: 20px;">
-        <select id="select-tabelas" onchange="carregarTabela()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="font-family: 'DM Serif Display'; margin: 0; color: var(--title-color);">Explorador de Base de Dados</h1>
+        <button id="edit-toggle-btn" class="btn-ui" onclick="toggleEditMode()">Editar</button>
+    </div>
+
+    <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+        <select id="select-tabelas" onchange="carregarTabela()" style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
             <option value="">-- Escolha uma tabela --</option>
         </select>
         
-        <div class="edit-only" style="margin-top: 15px;">
-            <button class="btn-add-row" onclick="adicionarLinha()">+ Adicionar Nova Linha</button>
+        <input type="text" id="search-input" oninput="filtrarTabela()" placeholder="🔍 Pesquisar na tabela..." style="flex: 3; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+        
+        <div class="edit-only">
+            <button class="btn-add-row" onclick="adicionarLinha()">+ Nova Linha</button>
         </div>
     </div>
 
-    <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border);">
+    <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px var(--shadow);">
         <table id="tabela-dados" style="width: 100%; border-collapse: collapse;">
             <thead id="tabela-head" style="background: var(--hover-bg);"></thead>
             <tbody id="tabela-body"></tbody>
@@ -64,7 +106,18 @@
     function toggleEditMode() {
         document.body.classList.toggle('edit-mode');
         const btn = document.getElementById('edit-toggle-btn');
-        btn.textContent = document.body.classList.contains('edit-mode') ? "Concluir" : "Editar";
+        const isEdit = document.body.classList.contains('edit-mode');
+        
+        btn.textContent = isEdit ? "Concluir" : "Editar";
+        atualizarCelulasEditaveis();
+    }
+
+    // Nova função para bloquear/desbloquear a escrita
+    function atualizarCelulasEditaveis() {
+        const isEdit = document.body.classList.contains('edit-mode');
+        document.querySelectorAll('.editable-cell').forEach(cell => {
+            cell.contentEditable = isEdit ? "true" : "false";
+        });
     }
 
     // 3. Carregar dados da tabela
@@ -82,40 +135,91 @@
 
         if (data.dados && data.dados.length > 0) {
             const headers = Object.keys(data.dados[0]);
-            const pk_col = headers[0];
+            const pk_col = headers[0]; // A primeira coluna é o ID
 
+            // --- CABEÇALHOS ---
             const trHead = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
-                th.style.padding = '15px';
-                th.textContent = h;
+                th.style.padding = '15px 20px';
+                th.textContent = h.toUpperCase(); // Fica mais profissional em maiúsculas
+                th.style.color = 'var(--text-muted)';
+                th.style.fontSize = '0.85rem';
+                th.style.letterSpacing = '0.5px';
+                
+                // Formatação específica para o ID
+                if (h === pk_col) {
+                    th.style.width = '5%';
+                    th.style.textAlign = 'center';
+                } else {
+                    th.style.textAlign = 'left';
+                }
                 trHead.appendChild(th);
             });
-            // Coluna ações
+            
+            // Cabeçalho de Ações (Escondido por defeito com 'edit-only')
             const thAction = document.createElement('th');
-            thAction.textContent = 'Ações';
+            thAction.textContent = 'AÇÕES';
+            thAction.className = 'edit-only';
+            thAction.style.padding = '15px 20px';
+            thAction.style.width = '8%';
+            thAction.style.textAlign = 'center';
+            thAction.style.color = 'var(--text-muted)';
+            thAction.style.fontSize = '0.85rem';
             trHead.appendChild(thAction);
             thead.appendChild(trHead);
 
+            // --- LINHAS ---
             data.dados.forEach(row => {
                 const tr = document.createElement('tr');
+                
                 headers.forEach(h => {
                     const td = document.createElement('td');
-                    td.style.padding = '15px';
-                    td.textContent = row[h];
-                    if (h !== pk_col) {
-                        td.contentEditable = "true";
+                    td.style.padding = '15px 20px';
+                    td.style.borderTop = '1px solid var(--border)';
+                    
+                    let cellText = row[h] !== null ? String(row[h]) : '';
+                    
+                    if (h === pk_col) {
+                        // O ID fica centrado e não editável
+                        td.style.textAlign = 'center';
+                        td.style.fontWeight = '500';
+                        td.style.color = 'var(--text-muted)';
+                        td.textContent = cellText;
+                    } 
+                    // NOVO: Detetar se é um JSON ou texto muito longo (como o DADOS_HISTORICO)
+                    else if (cellText.length > 50 && cellText.trim().startsWith('{')) {
+                        // Limpar aspas simples para não quebrar o HTML
+                        const safeText = cellText.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        td.innerHTML = `<button class="btn-ui" style="padding: 6px 12px; font-size: 0.8rem; background: var(--btn-draft-bg); color: var(--primary);" onclick="mostrarJSON('${safeText}')">👁️ Ver Dados</button>`;
+                        td.style.textAlign = 'center';
+                        td.contentEditable = "false"; // Bloqueado, não se edita JSON diretamente aqui
+                    } 
+                    else {
+                        // O resto fica normal e editável
+                        td.className = 'editable-cell';
+                        td.contentEditable = "false"; // Bloqueado por defeito (só ativa no Modo Edição)
+                        td.textContent = cellText;
                         td.onblur = function() { saveCell(table, pk_col, row[pk_col], h, this.textContent); };
                     }
                     tr.appendChild(td);
                 });
                 
-                // Botão Apagar (edit-only)
+                // Célula de Ações (edit-only)
                 const tdAction = document.createElement('td');
-                tdAction.innerHTML = `<button class="edit-only btn-delete-row" onclick="apagarLinha('${table}', '${pk_col}', '${row[pk_col]}')">-</button>`;
+                tdAction.className = 'edit-only';
+                tdAction.style.borderTop = '1px solid var(--border)';
+                tdAction.style.textAlign = 'center';
+                tdAction.innerHTML = `<button class="btn-delete-row" style="margin: 0 auto;" onclick="apagarLinha('${table}', '${pk_col}', '${row[pk_col]}')">-</button>`;
                 tr.appendChild(tdAction);
+                
                 tbody.appendChild(tr);
             });
+            
+            // Garantir que o modo edição atualiza as células novas
+            atualizarCelulasEditaveis();
+        } else {
+            tbody.innerHTML = `<tr><td colspan="100%" style="padding:30px; text-align:center; color: var(--text-muted);">A tabela '${table}' está vazia. Clique em Editar para adicionar linhas.</td></tr>`;
         }
     }
 
@@ -146,6 +250,41 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({table, id_col, id_val, column: col, value: val})
         });
+    }
+
+    function filtrarTabela() {
+    const input = document.getElementById('search-input').value.toLowerCase();
+    const tbody = document.getElementById('tabela-body');
+    const trs = tbody.getElementsByTagName('tr');
+
+        for (let i = 0; i < trs.length; i++) {
+            const rowText = trs[i].textContent.toLowerCase();
+                if (rowText.includes(input)) {
+                trs[i].style.display = "";
+            } else {
+                trs[i].style.display = "none";
+            }
+        }
+    }
+
+    // Função para abrir e formatar o JSON
+    function mostrarJSON(jsonString) {
+        try {
+            // Tenta converter o texto num objeto para formatar com espaços
+            const obj = JSON.parse(jsonString);
+            const formatado = JSON.stringify(obj, null, 4);
+            
+            // Abre uma mini-janela limpa
+            const win = window.open("", "_blank", "width=600,height=700");
+            win.document.write(`
+                <body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;">
+                    <h2>Dados do Histórico</h2>
+                    <pre style="font-size: 14px;">${formatado}</pre>
+                </body>
+            `);
+        } catch(e) {
+            alert("Dados Brutos:\n" + jsonString);
+        }
     }
 </script>
 {% endblock %}
