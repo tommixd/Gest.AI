@@ -1,489 +1,219 @@
-import os
-import torch
-import warnings
-import pdfplumber
-import mysql.connector
-import re
-from pathlib import Path
-from db_config import DB_CONFIG
-from collections import defaultdict
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from docx import Document as DocxDocument
+"""
+Orquestrador principal — RAG_LLM.py
+Junta os três componentes (FileLoader, RAG, SQLAgent) e expõe
+as funções `inicializar_rag` e `responder_pergunta`.
+"""
 
-# NOVO IMPORT PARA O MOTOR GGUF DA NVIDIA/RTX 4060
+import os
+import re
+import warnings
+import torch
+import unicodedata
+
 from llama_cpp import Llama
+from langchain_community.llms import LlamaCpp
+
+from file_loader import carregar_documentos
+from rag_component import construir_retriever, recuperar_com_foco, PASTA_TO_CHUNKS
+from sql_component import criar_sql_agent, consultar_bd
 
 warnings.filterwarnings("ignore")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Definir caminhos base
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-
-# A configuração DB_CONFIG é importada de db_config.py no topo do ficheiro
-
-# Variável global para mapear pasta -> lista de chunks (usado na resposta)
-PASTA_TO_CHUNKS = defaultdict(list)
-
-def ler_documentos_via_mysql():
-    """Liga-se ao MySQL e obtém documentos, extraindo o nome da pasta."""
-    
-    documentos_langchain = []
-    
-    try:
-        ligacao = mysql.connector.connect(**DB_CONFIG)
-        cursor = ligacao.cursor(dictionary=True)
-        cursor.execute("SELECT nome, caminho, categoria FROM documentos")
-        registos = cursor.fetchall()
-        cursor.close()
-        ligacao.close()
-    except Exception as e:
-        print(f"[!] Erro MySQL: {e}")
-        return []
-
-    print(f"[*] Encontrados {len(registos)} documentos na BD.")
-
-    for registo in registos:
-        caminho_db = registo["caminho"]
-        nome_doc = registo["nome"]
-        categoria = registo["categoria"]
-        
-        caminho_ficheiro = os.path.join(ROOT_DIR, caminho_db).replace('\\', '/')
-        if not os.path.exists(caminho_ficheiro):
-            caminho_ficheiro = os.path.join(BASE_DIR, caminho_db).replace('\\', '/')
-            if not os.path.exists(caminho_ficheiro):
-                print(f"[Aviso] '{nome_doc}' não encontrado em: {caminho_ficheiro}")
-                continue
-
-        caminho_obj = Path(caminho_ficheiro)
-        # Estrutura: Contrato_Name/2025-2026/ficheiro.docx
-        # parent = 2025-2026, parent.parent = Contrato_Name
-        periodo = caminho_obj.parent.name
-        nome_pasta = "Geral"
-        #Procura o nome da pasta que começa com "Contrato_" e tem o nome do docente
-        for parte in caminho_obj.parts:
-            if parte.startswith("Contrato_"):
-                nome_pasta = parte
-                break
-
-            
-        try:
-            if caminho_ficheiro.lower().endswith(".docx"):
-                doc_word = DocxDocument(caminho_ficheiro)
-                texto = "\n".join([p.text for p in doc_word.paragraphs if p.text.strip()])
-                if texto.strip():
-                    documentos_langchain.append(Document(
-                        page_content=texto, 
-                        metadata={
-                            "source": nome_doc,
-                            "categoria": categoria,
-                            "tipo": "docx",
-                            "pasta": nome_pasta,
-                            "periodo": periodo
-                        }
-                    ))
-
-            elif caminho_ficheiro.lower().endswith(".pdf"):
-                with pdfplumber.open(caminho_ficheiro) as pdf:
-                    for num_p, page in enumerate(pdf.pages):
-                        texto = page.extract_text() or ""
-                        if texto.strip():
-                            documentos_langchain.append(Document(
-                                page_content=texto, 
-                                metadata={
-                                    "source": nome_doc,
-                                    "categoria": categoria,
-                                    "page": num_p + 1,
-                                    "tipo": "pdf",
-                                    "pasta": nome_pasta,
-                                    "periodo": periodo
-                                }
-                            ))
-        except Exception as e:
-            print(f"[!] Erro ao processar {nome_doc}: {e}")
-
-    print(f"[*] Documentos carregados: {len(documentos_langchain)}")
-    return documentos_langchain
+# Tabelas que o SQL Agent pode consultar (lista branca de segurança)
+TABELAS_SQL = ["docentes", "rascunhos", "documentos", "carga_horaria", "cursos"]
 
 
-def obter_esquema_bd():
-    """Obtém o esquema de todas as tabelas relevantes para a LLM."""
-    esquema = ""
-    try:
-        db = mysql.connector.connect(**DB_CONFIG)
-        cursor = db.cursor()
-        cursor.execute("SHOW TABLES")
-        tabelas = [row[0] for row in cursor.fetchall()]
-        
-        for tabela in tabelas:
-            cursor.execute(f"DESCRIBE {tabela}")
-            colunas = [f"{row[0]} ({row[1]})" for row in cursor.fetchall()]
-            esquema += f"Tabela: {tabela} | Colunas: {', '.join(colunas)}\n"
-        
-        cursor.close()
-        db.close()
-    except Exception as e:
-        print(f"[!] Erro ao obter esquema: {e}")
-    return esquema
-
-def executar_sql_seguro(query):
-    """Executa uma query SQL (apenas SELECT) e retorna os resultados formatados."""
-    # Limpeza de formatação Markdown (```sql ... ```)
-    query_processada = re.sub(r'```sql\s*', '', query, flags=re.IGNORECASE)
-    query_processada = re.sub(r'```\s*', '', query_processada)
-    query_processada = query_processada.strip()
-
-    # Proteção básica contra queries não-SELECT
-    query_limpa = query_processada.upper()
-    if not query_limpa.startswith("SELECT") or any(keyword in query_limpa for keyword in ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE"]):
-        return f"Erro: Apenas consultas de leitura (SELECT) são permitidas. Query recebida: {query_processada}"
-
-    try:
-        db = mysql.connector.connect(**DB_CONFIG)
-        cursor = db.cursor(dictionary=True)
-        cursor.execute(query)
-        resultados = cursor.fetchall()
-        cursor.close()
-        db.close()
-        
-        if not resultados:
-            return "Nenhum registo encontrado na base de dados."
-        
-        # Formatar resultados de forma compacta
-        linhas = []
-        limite = 20 # Aumentado para 20 linhas
-        for res in resultados[:limite]:
-            linhas.append(str(res))
-        
-        resultado_final = "\n".join(linhas)
-        if len(resultados) > limite:
-            resultado_final += f"\n[Aviso: Foram encontrados {len(resultados)} registos, mas apenas os primeiros {limite} são mostrados por limite de contexto.]"
-        
-        return resultado_final
-    except Exception as e:
-        return f"Erro ao executar SQL: {e}"
-
-def obter_tabelas_com_coluna_nome_docente():
-    """Retorna as tabelas que contêm a coluna nome_docente na BD atual."""
-    try:
-        db = mysql.connector.connect(**DB_CONFIG)
-        cursor = db.cursor()
-        cursor.execute(
-            """
-            SELECT table_name
-            FROM information_schema.columns
-            WHERE table_schema = %s
-              AND column_name = 'nome_docente'
-            """,
-            (DB_CONFIG['database'],)
-        )
-        tabelas = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        db.close()
-        return tabelas
-    except Exception as e:
-        print(f"[!] Erro ao obter tabelas com nome_docente: {e}")
-        return []
-
-
-def buscar_registos_por_nome(nome_pessoa):
-    """Procura nas tabelas 'docentes' e 'rascunhos' pelos registos do docente."""
-    resultados = []
-    
-    try:
-        db = mysql.connector.connect(**DB_CONFIG)
-        cursor = db.cursor(dictionary=True)
-        
-        # 1. Procurar na tabela DOCENTES (onde a coluna se chama 'nome')
-        try:
-            cursor.execute(
-                "SELECT * FROM docentes WHERE nome LIKE %s LIMIT 5",
-                (f"%{nome_pessoa}%",)
-            )
-            for registo in cursor.fetchall():
-                resultados.append({
-                    'tabela': 'docentes',
-                    'registo': registo
-                })
-        except Exception as e:
-            print(f"[!] Erro ao consultar docentes: {e}")
-
-        # 2. Procurar na tabela RASCUNHOS (onde a coluna se chama 'nome_docente')
-        try:
-            cursor.execute(
-                "SELECT * FROM rascunhos WHERE nome_docente LIKE %s LIMIT 5",
-                (f"%{nome_pessoa}%",)
-            )
-            for registo in cursor.fetchall():
-                resultados.append({
-                    'tabela': 'rascunhos',
-                    'registo': registo
-                })
-        except Exception as e:
-            print(f"[!] Erro ao consultar rascunhos: {e}")
-            
-        cursor.close()
-        db.close()
-    except Exception as e:
-        print(f"[!] Erro ao conectar à BD para buscar registos: {e}")
-
-    return resultados
-
-
-def formatar_registo_bd(tabela, registo):
-    """Formata um registo para texto compacto no prompt."""
-    campos = []
-    for chave, valor in registo.items():
-        if valor is None:
-            continue
-        campos.append(f"{chave}={valor}")
-        if len(campos) >= 6:
-            break
-    return f"[Registo do Sistema Central - Tabela: {tabela}] " + ", ".join(campos)
-
+# ---------------------------------------------------------------------------
+# Inicialização
+# ---------------------------------------------------------------------------
 
 def inicializar_rag():
-    """Inicializa o sistema RAG e cria o mapeamento pasta->chunks."""
-    global PASTA_TO_CHUNKS
-    print(f"[*] Motor: {dispositivo.upper()}")
+    """
+    Inicializa os três componentes e devolve (retriever, llm, sql_agente).
     
-    docs = ler_documentos_via_mysql()
-    if not docs:
-        print("[!] Nenhum documento carregado.")
-        return None, None
+    Returns:
+        Tuple (retriever, llm, sql_agente) ou (None, None, None) em caso de erro.
+    """
+    print(f"[Sistema] Motor: {dispositivo.upper()}")
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,       # Reduzido para permitir mais chunks sem estourar o contexto
-        chunk_overlap=150,
-        separators=["\n\n", "\n", ".", " ", ""]
-    )
-    chunks = splitter.split_documents(docs)
+    # --- Componente 1: FileLoader ---
+    documentos = carregar_documentos()
+    if not documentos:
+        print("[Sistema] Nenhum documento carregado. A abortar.")
+        return None, None, None
 
-    PASTA_TO_CHUNKS.clear()
-    for chunk in chunks:
-        pasta = chunk.metadata.get('pasta', 'SEM_PASTA')
-        PASTA_TO_CHUNKS[pasta].append(chunk)
+    # --- Componente 2: RAG ---
+    retriever = construir_retriever(documentos)
 
-    print("[*] A carregar embeddings no CPU para poupar VRAM...")
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-        model_kwargs={'device': 'cpu'}
-    )
-    
-    db = FAISS.from_documents(chunks, embeddings)
-    
-    # --- NOVO BLOCO GGUF PARA A RTX 4060 ---
-    print("[*] A carregar Qwen2.5-Coder-7B GGUF...")
+    # --- LLM (partilhada pelos componentes 2 e 3) ---
     model_path = os.path.join(BASE_DIR, "Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf")
-    llm = Llama(
-        model_path=model_path, # Caminho absoluto baseado no diretório do script
-        n_gpu_layers=-1, 
-        n_ctx=8192,      # Aumentado para suportar mais documentos no contexto      
-        verbose=True    
+
+    # LlamaCpp do LangChain (para o SQL Agent, que precisa de BaseLLM)
+    llm_langchain = LlamaCpp(
+        model_path=model_path,
+        n_gpu_layers=-1,
+        n_ctx=8192,
+        temperature=0.1,
+        verbose=False,
     )
-    
-    # Aumentado o número de documentos recuperados (k) para dar mais contexto
-    retriever = db.as_retriever(search_kwargs={"k": 5, "fetch_k": 20})
-    return retriever, llm
+
+    # llama-cpp nativa (para o prompt RAG final, mais controlo)
+    llm_native = Llama(
+        model_path=model_path,
+        n_gpu_layers=-1,
+        n_ctx=8192,
+        verbose=False,
+    )
+
+    # --- Componente 3: SQL Agent ---
+    sql_agente = criar_sql_agent(llm_langchain, tabelas_permitidas=TABELAS_SQL)
+
+    print("[Sistema] Inicialização completa.")
+    return retriever, llm_native, sql_agente
 
 
-def responder_pergunta(pergunta, retriever, llm):
-    global PASTA_TO_CHUNKS
-    
-    nome_pessoa = None
-    # Melhorada a regex para extração de nomes (mais flexível)
-    match = re.search(r'(?:da|de|do|d[ae])?\s*([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)', pergunta)
+# ---------------------------------------------------------------------------
+# Utilitários de extração
+# ---------------------------------------------------------------------------
+
+def _extrair_nome(pergunta: str) -> str | None:
+    """Extrai um nome próprio composto da pergunta."""
+    match = re.search(
+        r'(?:da|de|do|d[ae])?\s*([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)',
+        pergunta
+    )
     if match:
-        nome_pessoa = match.group(1).strip()
+        return match.group(1).strip()
 
-    # Procura também por anos na pergunta (ex: 2025, 2026/2027)
-    anos_na_pergunta = re.findall(r'\b(20\d{2}(?:/\d{2,4})?)\b', pergunta)
+    # Fallback: procura por nome de pasta em minúsculas
+    pergunta_lower = pergunta.lower()
+    for pasta in PASTA_TO_CHUNKS:
+        if pasta.startswith("Contrato_"):
+            nome = pasta.replace("Contrato_", "").replace("_", " ").lower()
+            if nome and nome in pergunta_lower:
+                return pasta.replace("Contrato_", "").replace("_", " ")
+    return None
 
-    # se escrever com minusculas, o sistema procura o nome na lista de pastas que já conhece
-    if not nome_pessoa:
-        pergunta_lower = pergunta.lower()
-        for pasta in PASTA_TO_CHUNKS.keys():
-            if pasta.startswith("Contrato_"):
-                nome_docente_pasta = pasta.replace("Contrato_", "").replace("_", " ").lower()
-                if nome_docente_pasta and nome_docente_pasta in pergunta_lower:
-                    nome_pessoa = pasta.replace("Contrato_", "").replace("_", " ")
-                    break
+def remover_acentos(texto: str) -> str:
+    """Remove acentos de uma string para garantir match nas pastas."""
+    if not texto: return ""
+    return ''.join(c for c in unicodedata.normalize('NFD', texto)
+                  if unicodedata.category(c) != 'Mn')
 
-    print(f"[DEBUG] Nome extraído: {nome_pessoa}")
-    print(f"[DEBUG] Anos extraídos: {anos_na_pergunta}")
+def _encontrar_pasta(nome: str) -> str | None:
+    """Encontra a pasta 'Contrato_*' correspondente ao nome dado (ignorando acentos)."""
+    nome_norm = remover_acentos(nome).replace(" ", "_").lower()
+    for pasta in PASTA_TO_CHUNKS:
+        pasta_norm = remover_acentos(pasta).lower()
+        if nome_norm in pasta_norm:
+            return pasta
+    return None
+
+def _formatar_contexto_docs(docs) -> str:
+    partes = []
+    for d in docs:
+        fonte  = d.metadata.get("source", "?")
+        pasta  = d.metadata.get("pasta", "Geral")
+        period = d.metadata.get("periodo", "Desconhecido")
+        partes.append(f"[Ficheiro: {fonte} | Pasta: {pasta} | Período: {period}]\n{d.page_content}\n")
+    return "\n".join(partes)
+
+
+# ---------------------------------------------------------------------------
+# Resposta principal
+# ---------------------------------------------------------------------------
+
+def responder_pergunta(
+    pergunta: str,
+    retriever,
+    llm,
+    sql_agente,
+) -> tuple[str, str]:
+    """
+    Orquestra os três componentes para responder a uma pergunta:
+      1. Componente 3 (SQL Agent): tenta obter dados estruturados da BD.
+      2. Componente 2 (RAG): recupera documentos relevantes.
+      3. LLM: gera a resposta final com todo o contexto combinado.
     
-    info_bd = ""
-    if nome_pessoa:
-        registos_bd = buscar_registos_por_nome(nome_pessoa)
-        if registos_bd:
-            info_partes = []
-            for item in registos_bd:
-                texto_registo = formatar_registo_bd(item['tabela'], item['registo'])
-                info_partes.append(texto_registo)
-                if item['tabela'] == 'rascunhos':
-                    rascunho = item['registo']
-                    info_partes.append(
-                        f"O processo de {rascunho.get('nome_docente')} encontra-se guardado como um RASCUNHO (Incompleto) do tipo '{rascunho.get('tipo_contrato')}'."
-                    )
-                    print(f"[DEBUG] Rascunho encontrado para: {nome_pessoa}")
+    Returns:
+        Tuple (resposta, contexto_docs_usado).
+    """
 
-            info_bd = "\n".join(info_partes)
-        else:
-            print(f"[DEBUG] Nenhum registo encontrado em tabelas com nome_docente para: {nome_pessoa}")
+    # --- Extração de entidades ---
+    nome_pessoa  = _extrair_nome(pergunta)
+    pasta_forçada = _encontrar_pasta(nome_pessoa) if nome_pessoa else None
+    anos = re.findall(r'\b(20\d{2}(?:/\d{2,4})?)\b', pergunta)
 
-    docs_rel = retriever.invoke(pergunta)
-    
-    pasta_forcada = None
-    if nome_pessoa:
-        # Normalização do nome para procura de pasta
-        nome_normalizado = nome_pessoa.replace(' ', '_').lower()
-        for pasta in PASTA_TO_CHUNKS.keys():
-            if nome_normalizado in pasta.lower():
-                pasta_forcada = pasta
-                break
-        
-        if pasta_forcada:
-            chunks_adicionais = PASTA_TO_CHUNKS[pasta_forcada]
-            existing = {(d.page_content, d.metadata.get('source')) for d in docs_rel}
-            for chunk in chunks_adicionais:
-                key = (chunk.page_content, chunk.metadata.get('source'))
-                if key not in existing:
-                    docs_rel.append(chunk)
-                    existing.add(key)
-    
-    if not docs_rel and not info_bd:
-        return "Não encontrei documentos ou registos na base de dados sobre isso.", ""
-    
-    # Ordenação inteligente: Prioriza pasta forçada E depois ordena por período (mais recente primeiro ou por relevância)
-    if pasta_forcada:
-        # Coloca documentos da pasta forçada no topo, mas mantém a diversidade de períodos
-        docs_rel = sorted(docs_rel, key=lambda d: (
-            0 if d.metadata.get('pasta') == pasta_forcada else 1,
-            -int(re.search(r'\d+', d.metadata.get('periodo', '0')).group()) if re.search(r'\d+', d.metadata.get('periodo', '')) else 0
-        ))
-    
-    # Aumentado o limite de documentos para o contexto da LLM para capturar múltiplos períodos
-    docs_rel = docs_rel[:10]      # Ajustado para 10 para segurança adicional
-    
-    contexto_parts = []
-    for i, d in enumerate(docs_rel, 1):
-        fonte = d.metadata.get('source', '?')
-        pasta = d.metadata.get('pasta', 'Geral')
-        periodo = d.metadata.get('periodo', 'Desconhecido')
-        conteudo = d.page_content
-        contexto_parts.append(f"[Ficheiro: {fonte} | Pasta: {pasta} | Período: {periodo}]\n{conteudo}\n")
-    contexto = "\n".join(contexto_parts)
-    
-    # --- LÓGICA TEXT-TO-SQL ---
-    esquema_bd = obter_esquema_bd()
-    prompt_sql = f"""<|im_start|>system
-És um especialista em SQL para MySQL. A tua tarefa é analisar a pergunta do utilizador e o esquema da base de dados e decidir se é necessária uma consulta SQL para responder.
-
-Esquema da Base de Dados:
-{esquema_bd}
-
-REGRAS:
-1. Se a pergunta for analítica (contagens, listas, somas) ou sobre dados estruturados na BD, responde APENAS com a query SQL.
-2. A query deve ser APENAS de leitura (SELECT).
-3. Se a pergunta for sobre o conteúdo de documentos (RAG) ou se não souberes a resposta via SQL, responde "NÃO_SQL".
-4. NUNCA inventes tabelas ou colunas que não estejam no esquema.
-
-Exemplos:
-Pergunta: "Quantos docentes existem?" -> SELECT COUNT(*) FROM docentes;
-Pergunta: "Lista os rascunhos de 2025" -> SELECT * FROM rascunhos WHERE ano_letivo LIKE '%2025%';
-Pergunta: "O que diz o contrato do Tomás?" -> NÃO_SQL
-<|im_end|>
-<|im_start|>user
-{pergunta}
-<|im_end|>
-<|im_start|>assistant
-"""
-    sql_query = ""
+    # --- Componente 3: SQL Agent ---
+    info_sql = ""
     try:
-        res_sql = llm(prompt_sql, max_tokens=128, stop=["<|im_end|>"])
-        sugestao = res_sql["choices"][0]["text"].strip()
-        if "SELECT" in sugestao.upper():
-            sql_query = sugestao
-            print(f"[DEBUG] SQL Gerado: {sql_query}")
-            info_sql = executar_sql_seguro(sql_query)
-            print(f"[DEBUG] SQL Resultado: {info_sql}") # Adicionado debug do resultado
-            
-            # Se o SQL falhou ou foi bloqueado, não inserimos no contexto para não confundir a LLM
-            if not info_sql.startswith("Erro:"):
-                # Formatação mais clara para a LLM entender que isto é a resposta da BD
-                info_bd += f"\n--- INÍCIO DOS DADOS DA BASE DE DADOS ---\n[Consulta SQL Dinâmica]\nPergunta: {pergunta}\nQuery: {sql_query}\nDados Encontrados:\n{info_sql}\n--- FIM DOS DADOS DA BASE DE DADOS ---\n"
-            else:
-                print(f"[!] SQL Bloqueado/Erro: {info_sql}")
+        resultado_sql = consultar_bd(pergunta, sql_agente)
+        # O agente devolve texto; só usamos se contiver dados úteis
+        if resultado_sql and "não" not in resultado_sql.lower()[:30]:
+            info_sql = f"\n--- DADOS DA BASE DE DADOS ---\n{resultado_sql}\n--- FIM ---\n"
     except Exception as e:
-        print(f"[!] Erro na geração/execução de SQL: {e}")
+        print(f"[Orquestrador] SQL Agent ignorado: {e}")
 
-    instrucao_adicional = ""
-    if pasta_forcada:
-        instrucao_adicional = f"Foca-te prioritariamente na informação da pasta '{pasta_forcada}' para responder a esta pergunta."
-    
-    if anos_na_pergunta:
-        instrucao_adicional += f" Presta especial atenção aos dados referentes ao(s) ano(s)/período(s): {', '.join(anos_na_pergunta)}."
+    # --- Componente 2: RAG ---
+    docs = recuperar_com_foco(pergunta, retriever, nome_pasta=pasta_forçada)
+    if not docs and not info_sql:
+        return "Não encontrei documentos ou registos sobre isso.", ""
 
-    # Re-construir o conhecimento após a execução do SQL
-    conhecimento_sistema = ""
-    if info_bd:
-        conhecimento_sistema += f"Informação atual da base de dados (registos e consultas):\n{info_bd}\n\n"
-    if contexto:
-        conhecimento_sistema += f"Informação extraída dos Documentos do processo:\n{contexto}\n\n"
-    if not conhecimento_sistema:
-        conhecimento_sistema = "Não possuis qualquer informação no momento sobre este assunto."
+    contexto_docs = _formatar_contexto_docs(docs)
 
+    # --- Contexto combinado ---
+    conhecimento = ""
+    if info_sql:
+        conhecimento += f"Informação da base de dados:\n{info_sql}\n\n"
+    if contexto_docs:
+        conhecimento += f"Informação dos documentos:\n{contexto_docs}\n\n"
+    if not conhecimento:
+        conhecimento = "Não possuis qualquer informação disponível sobre este assunto."
+
+    instrucao = ""
+    if pasta_forçada:
+        instrucao += f"Foca-te prioritariamente na informação da pasta '{pasta_forçada}'."
+    if anos:
+        instrucao += f" Presta especial atenção aos períodos: {', '.join(anos)}."
+
+    # --- Prompt final ---
     prompt = f"""<|im_start|>system
-És o Gest.AI, um assistente inteligente de recursos humanos e gestão académica.
-A tua missão é responder à pergunta do utilizador de forma natural, direta e prestável.
+És o Gest.AI, um assistente de recursos humanos e gestão académica.
+Responde de forma natural, direta e profissional.
 
-Abaixo está a tua base de conhecimento atual sobre este caso. Usa APENAS esta informação para responder. 
+REGRA 1: Usa APENAS o conhecimento abaixo. Nunca inventes dados.
+REGRA 2: Se a resposta vier dos documentos, cita o nome do ficheiro.
+REGRA 3: SÓ podes dizer "De acordo com a base de dados" se a informação vier explicitamente do bloco "--- DADOS DA BASE DE DADOS ---". Se vier dos documentos, SÓ podes citar o nome do ficheiro.
+REGRA 4: Prioriza sempre os dados da base de dados sobre os documentos em caso de conflito. NO ENTANTO, se os documentos fornecerem detalhes mais específicos e complementares que não contradigam a base de dados (ex: a base de dados diz a área, mas os documentos dizem o nome exato da cadeira), funde as duas informações numa resposta rica.
+REGRA 5: Se houver dados para vários anos letivos, distingue-os claramente.
 
-REGRA DE OURO: Age como se este conhecimento fosse teu. Não uses frases robóticas como "De acordo com os documentos" ou "A base de dados diz", EXCETO se o utilizador te perguntar especificamente "De onde tiraste essa informação?", "Qual é o ficheiro?" ou "Qual a fonte?". Nesses casos, podes referir os nomes dos ficheiros e pastas indicados no conhecimento.
-
-REGRA 1: Se a resposta não estiver no contexto, responde "Não encontrei informação sobre isso nos documentos." NUNCA inventes dados.
-REGRA 2: Sempre que justificares uma resposta com base nos documentos, DEVES citar o nome do ficheiro que usaste (ex: "Segundo o ficheiro X.docx...").
-REGRA 3: Sê direto e profissional.
-REGRA 4: Se a informação vier de um "[Registo do Sistema Central...]", deves dizer que verificaste na "base de dados do sistema" ou na "ficha de docente" e NUNCA num ficheiro.
-	REGRA 5: Se a informação vier de um "[Ficheiro: ...]", podes e deves referir o nome desse documento/ficheiro.
-	
-	REGRA 6 (PRIORIDADE): Se houver conflito entre a informação da "Base de Dados (registos e consultas)" e a "Informação extraída dos Documentos", deves SEMPRE priorizar a informação da Base de Dados. Se houver dados em "--- INÍCIO DOS DADOS DA BASE DE DADOS ---", essa é a tua fonte principal de verdade para responder à pergunta. Use esses dados para construir a tua resposta de forma natural.
-	
-	REGRA DE HISTÓRICO: O utilizador valoriza muito a precisão cronológica. Se houver dados diferentes para anos letivos diferentes (ex: 2025/2026 vs 2026/2027), DEVES distinguir claramente as situações na tua resposta. Se o utilizador não especificar o ano, apresenta a informação de forma estruturada por período.
-
-[INÍCIO DO CONHECIMENTO]
-{conhecimento_sistema}
+[CONHECIMENTO]
+{conhecimento}
 [FIM DO CONHECIMENTO]
 
-{instrucao_adicional}
+{instrucao}
 <|im_end|>
 <|im_start|>user
 {pergunta}
 <|im_end|>
 <|im_start|>assistant
 """
-    
+
     try:
-        resposta_raw = llm(
-            prompt,
-            max_tokens=768,       # Aumentado para permitir respostas mais detalhadas sobre múltiplos períodos
-            temperature=0.1,
-            stop=["<|im_end|>"]
-        )
-        resposta = resposta_raw["choices"][0]["text"].strip()
+        raw = llm(prompt, max_tokens=768, temperature=0.1, stop=["<|im_end|>"])
+        resposta = raw["choices"][0]["text"].strip()
     except Exception as e:
-        return f"Erro ao gerar resposta da IA: {e}", ""
-    
-    # Adição de fontes usadas de forma mais abrangente
-    if pasta_forcada:
-        docs_da_pasta = [d for d in docs_rel if d.metadata.get('pasta') == pasta_forcada]
-        if docs_da_pasta:
-            fontes_usadas = list(set([d.metadata.get('source', '?') for d in docs_da_pasta]))
-            fontes_str = ", ".join(fontes_usadas)
-            if not f"*(Fonte: {fontes_str})*" in resposta:
+        return f"Erro ao gerar resposta: {e}", ""
+
+    # Adiciona fontes usadas
+    if pasta_forçada:
+        fontes = list({d.metadata.get("source", "?") for d in docs if d.metadata.get("pasta") == pasta_forçada})
+        if fontes:
+            fontes_str = ", ".join(fontes)
+            if f"*(Fonte: {fontes_str})*" not in resposta:
                 resposta += f"\n\n*(Fonte: {fontes_str})*"
-            
-    return resposta, contexto
+
+    return resposta, contexto_docs

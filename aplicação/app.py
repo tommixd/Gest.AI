@@ -18,15 +18,15 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
-    import RAG_LLM
+    import rag_llm
     import importlib
-    importlib.reload(RAG_LLM)
-    from RAG_LLM import responder_pergunta, inicializar_rag
+    importlib.reload(rag_llm)
+    from rag_llm import responder_pergunta, inicializar_rag
     print("[OK] Funções do RAG_LLM carregadas com sucesso.")
 except Exception as e:
-    print(f"[!] Erro crítico ao carregar RAG_LLM: {e}")
+    print(f"[!] Erro crítico ao carregar rag_llm: {e}")
     def responder_pergunta(*args): return "IA em manutenção.", ""
-    def inicializar_rag(): return None, None
+    def inicializar_rag(): return None, None, None
 
 try:
     from templates import processar_renovacao
@@ -53,6 +53,7 @@ PASTA_UPLOADS = 'PastaUploadsSiteTest'
 # --- CONFIGURAÇÃO DA IA EM BACKGROUND ---
 global_retriever = None
 global_llm = None
+global_sql_agent = None
 ia_pronta = False
 
 def migrar_contratos_existentes_para_bd():
@@ -119,11 +120,11 @@ def migrar_contratos_existentes_para_bd():
         print(f"[!] Erro na migração: {e}")
 
 def iniciar_ia_background():
-    global global_retriever, global_llm, ia_pronta
+    global global_retriever, global_llm, global_sql_agent, ia_pronta
     try:
         print("\n[A inicializar o cérebro Gest.AI em 2º plano...]")
-        global_retriever, global_llm = inicializar_rag()
-        if global_retriever and global_llm:
+        global_retriever,  global_llm, global_sql_agent = inicializar_rag()
+        if global_retriever and global_llm and global_sql_agent:
             ia_pronta = True
             print("\n[=========================================]")
             print("[ IA PRONTA! O Chatbox já pode responder. ]")
@@ -730,7 +731,7 @@ def chat():
     if not msg: return jsonify({"reply": "Escreve uma mensagem."}), 400
     if not ia_pronta: return jsonify({"reply": "IA a carregar..."}), 200
     try:
-        res, _ = responder_pergunta(msg, global_retriever, global_llm)
+        res, _ = responder_pergunta(msg, global_retriever, global_llm, global_sql_agent)
         return jsonify({"reply": res}), 200
     except Exception as e:
         return jsonify({"reply": f"Erro: {e}"}), 500
