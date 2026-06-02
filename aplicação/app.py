@@ -39,6 +39,13 @@ except ImportError:
 app = Flask(__name__)
 app.config["SITE_NAME"] = "Gest.AI"  
 
+# Tipos de contratos mostrados na página de documentos
+TIPOS_DOCUMENTOS_PERMITIDOS = {
+    'tempo integral anual',
+    'tempo parcial semestral',
+    'tempo parcial edital'
+}
+
 # --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
 # Usamos DB_CONFIG partilhado em db_config.py
 PASTA_UPLOADS = 'PastaUploadsSiteTest'
@@ -305,6 +312,13 @@ def index():
     lista_documentos = cursor.fetchall()
     cursor.close()
     
+    # Filtra apenas os contratos que a instituição realiza
+    lista_documentos = [
+        doc for doc in lista_documentos
+        if doc['categoria'] in TIPOS_DOCUMENTOS_PERMITIDOS
+        and 'Modelos Gerados' not in doc['caminho']
+    ]
+
     # Estrutura: documentos_agrupados[categoria][nome_contrato][subpasta_ou_files] = [lista_de_docs]
     documentos_agrupados = {}
     
@@ -937,9 +951,9 @@ def apagar_pasta(caso):
         return jsonify({"sucesso": False, "erro": str(e)}), 500
         
 
-@app.route('/importar-historico')
-def importar_historico():
-    return render_template('importar.html')
+#@app.route('/importar-historico')
+#def importar_historico():
+#    return render_template('importar.html')
 
 @app.route('/base-dados')
 def explorar_bd():
