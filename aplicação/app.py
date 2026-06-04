@@ -8,8 +8,12 @@ import shutil
 import mysql.connector
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, g, request, send_file, jsonify, url_for
-from werkzeug.utils import secure_filename
+#vários imports ainda não utilizados mas que serão uteis para futuras funcionalidades (ex: gestão de utilizadores, autenticação, etc.)
+from flask import Flask, render_template, g, request, send_file, jsonify, abort
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.utils import secure_filename, generate_password_hash, check_password_hash 
+from functools import wraps
 from db_config import DB_CONFIG
 
 # --- GARANTIR IMPORTAÇÃO CORRETA DO RAG_LLM ---
@@ -305,14 +309,6 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
-
-@app.route('/login')
-def login():
-    return render_template('login.html')
-
-@app.route('/register')
-def register():
-    return render_template('register.html')
 
 @app.route('/')  
 def index():
