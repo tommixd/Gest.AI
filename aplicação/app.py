@@ -18,13 +18,13 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
-    import rag_llm
+    import RAG_LLM
     import importlib
-    importlib.reload(rag_llm)
-    from rag_llm import responder_pergunta, inicializar_rag
+    importlib.reload(RAG_LLM)
+    from RAG_LLM import responder_pergunta, inicializar_rag
     print("[OK] Funções do RAG_LLM carregadas com sucesso.")
 except Exception as e:
-    print(f"[!] Erro crítico ao carregar rag_llm: {e}")
+    print(f"[!] Erro crítico ao carregar RAG_LLM: {e}")
     def responder_pergunta(*args): return "IA em manutenção.", ""
     def inicializar_rag(): return None, None, None
 
