@@ -8,7 +8,7 @@ import shutil
 import mysql.connector
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, g, request, send_file, jsonify
+from flask import Flask, render_template, g, request, send_file, jsonify, url_for
 from werkzeug.utils import secure_filename
 from db_config import DB_CONFIG
 
@@ -305,6 +305,15 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
+
+@app.route('/login')
+def login():
+    return render_template('login.html')
+
+@app.route('/register')
+def register():
+    return render_template('register.html')
+
 @app.route('/')  
 def index():
     db = get_db()
@@ -360,6 +369,7 @@ def index():
             documentos_agrupados[cat]['Geral']['Ficheiros'].append(doc)
             
     return render_template('index.html', documentos_agrupados=documentos_agrupados)
+
 
 @app.route('/contratacao/<tipo>')
 def iniciar_contratacao(tipo):
