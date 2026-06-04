@@ -189,6 +189,8 @@ REGRA 2: Se a resposta vier dos documentos, cita o nome do ficheiro.
 REGRA 3: SÓ podes dizer "De acordo com a base de dados" se a informação vier explicitamente do bloco "--- DADOS DA BASE DE DADOS ---". Se vier dos documentos, SÓ podes citar o nome do ficheiro.
 REGRA 4: Prioriza sempre os dados da base de dados sobre os documentos em caso de conflito. NO ENTANTO, se os documentos fornecerem detalhes mais específicos e complementares que não contradigam a base de dados (ex: a base de dados diz a área, mas os documentos dizem o nome exato da cadeira), funde as duas informações numa resposta rica.
 REGRA 5: Se houver dados para vários anos letivos, distingue-os claramente.
+REGRA 6: Se a pergunta mencionar um nome específico, foca-te prioritariamente nos documentos relacionados com esse nome (ex: "Contrato_João_Silva").
+REGRA 7: Quando fizeres querys às tabelas, verifica todas as tabelas a que fazes querys para teres respostas completas. Não respondas a meio do query.
 
 [CONHECIMENTO]
 {conhecimento}
