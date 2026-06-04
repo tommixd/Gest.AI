@@ -109,7 +109,7 @@
       </div>
       <div class="form-group">
         <label>Área de Contratação *</label>
-        <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required placeholder="Ex: Informática" value="{{ form_data.get('area_contratacao', '') if form_data else '' }}">
+        <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required placeholder="Ex: Informática" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
       </div>
       <div class="form-group" id="horario-semanal-group" style="display:none;">
         <label>Horário Semanal</label>
@@ -125,11 +125,11 @@
       </div>
       <div class="form-group">
         <label>Áreas Curriculares *</label>
-        <input type="text" name="areas_curriculares" list="lista-areas" autocomplete="off" required placeholder="Ex: Matemática e Física" value="{{ form_data.get('areas_curriculares', '') if form_data else '' }}">
+        <input type="text" name="areas_curriculares" list="lista-areas" autocomplete="off" required placeholder="Ex: Matemática e Física" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
       </div>
       <div class="form-group full-width">
         <label>Funções Externas</label>
-        <input type="text" name="funcoes_externas" list="lista-funcoes" autocomplete="off" value="{{ form_data.get('funcoes_externas', 'Não exerce funções externas') if form_data else 'Não exerce funções externas' }}">
+        <input type="text" name="funcoes_externas" list="lista-funcoes" autocomplete="off" value="{{ form_data.get('funcoes_externas', 'Não exerce funções externas') if form_data else 'Exerce funções externas' }}">
       </div>
     </div>
 

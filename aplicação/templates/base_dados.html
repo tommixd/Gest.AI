@@ -180,6 +180,11 @@
                     
                     let cellText = row[h] !== null ? String(row[h]) : '';
                     
+                    // DEBUG
+                    if (h === 'DADOS_HISTORICO') {
+                        console.log(`[HEADER: ${h}] length: ${cellText.length}`);
+                    }
+                    
                     if (h === pk_col) {
                         // O ID fica centrado e não editável
                         td.style.textAlign = 'center';
@@ -187,13 +192,51 @@
                         td.style.color = 'var(--text-muted)';
                         td.textContent = cellText;
                     } 
-                    // NOVO: Detetar se é um JSON ou texto muito longo (como o DADOS_HISTORICO)
-                    else if (cellText.length > 50 && cellText.trim().startsWith('{')) {
-                        // Limpar aspas simples para não quebrar o HTML
-                        const safeText = cellText.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                        td.innerHTML = `<button class="btn-ui" style="padding: 6px 12px; font-size: 0.8rem; background: var(--btn-draft-bg); color: var(--primary);" onclick="mostrarJSON('${safeText}')">👁️ Ver Dados</button>`;
+                    // FILTRO: Truncate para colunas problemáticas (dados_historico, dados_historicos, etc)
+                    else if (h.toLowerCase().includes('dados_historico') && cellText.length > 0) {
+                        console.log(`[BUTTON CREATED] for ${h}`);
+                        // Criar botão e adicionar listener
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-ui';
+                        btn.style.padding = '6px 12px';
+                        btn.style.fontSize = '0.8rem';
+                        btn.style.background = 'var(--btn-draft-bg)';
+                        btn.style.color = 'var(--primary)';
+                        btn.textContent = '👁️ Ver Dados';
+                        btn.type = 'button';
+                        
+                        // Armazenar os dados no dataset do botão
+                        btn.dataset.conteudo = cellText;
+                        
+                        btn.addEventListener('click', function() {
+                            mostrarConteudo(this.dataset.conteudo);
+                        });
+                        
+                        td.appendChild(btn);
                         td.style.textAlign = 'center';
-                        td.contentEditable = "false"; // Bloqueado, não se edita JSON diretamente aqui
+                        td.contentEditable = "false";
+                    } 
+                    else if (cellText.length > 100) {
+                        console.log(`[LONG TEXT] ${cellText.substring(0, 30)}... (${cellText.length} chars)`);
+                        // Conteúdo muito longo também mostra o botão
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-ui';
+                        btn.style.padding = '6px 12px';
+                        btn.style.fontSize = '0.8rem';
+                        btn.style.background = 'var(--btn-draft-bg)';
+                        btn.style.color = 'var(--primary)';
+                        btn.textContent = '👁️ Ver Dados';
+                        btn.type = 'button';
+                        
+                        btn.dataset.conteudo = cellText;
+                        
+                        btn.addEventListener('click', function() {
+                            mostrarConteudo(this.dataset.conteudo);
+                        });
+                        
+                        td.appendChild(btn);
+                        td.style.textAlign = 'center';
+                        td.contentEditable = "false";
                     } 
                     else {
                         // O resto fica normal e editável
@@ -267,23 +310,30 @@
         }
     }
 
-    // Função para abrir e formatar o JSON
-    function mostrarJSON(jsonString) {
+    // Função para abrir e formatar o conteúdo (JSON ou texto longo)
+    function mostrarConteudo(conteudoString) {
         try {
-            // Tenta converter o texto num objeto para formatar com espaços
-            const obj = JSON.parse(jsonString);
-            const formatado = JSON.stringify(obj, null, 4);
+            // Tenta converter o texto num objeto JSON para formatar com espaços
+            let formatado;
+            try {
+                const obj = JSON.parse(conteudoString);
+                formatado = JSON.stringify(obj, null, 4);
+            } catch(e) {
+                // Se não for JSON válido, usa o texto como está
+                formatado = conteudoString;
+            }
             
-            // Abre uma mini-janela limpa
-            const win = window.open("", "_blank", "width=600,height=700");
+            // Abre uma janela com o conteúdo formatado
+            const win = window.open("", "_blank", "width=700,height=800");
             win.document.write(`
                 <body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;">
-                    <h2>Dados do Histórico</h2>
-                    <pre style="font-size: 14px;">${formatado}</pre>
+                    <h2 style="margin-top: 0; color: #4fc3f7;">Conteúdo Completo</h2>
+                    <pre style="font-size: 13px; max-height: 600px; overflow: auto; background: #252526; padding: 15px; border-radius: 6px; border: 1px solid #3e3e42; white-space: pre-wrap; word-wrap: break-word;">${formatado.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                    <button onclick="window.close()" style="padding: 8px 16px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-family: 'Outfit', sans-serif;">Fechar</button>
                 </body>
             `);
         } catch(e) {
-            alert("Dados Brutos:\n" + jsonString);
+            alert("Erro ao mostrar dados: " + e);
         }
     }
 </script>
