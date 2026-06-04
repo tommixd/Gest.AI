@@ -1,4 +1,6 @@
 Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf
 Qwen2.5.1-Coder-7B-Instruct-Q4_K_M-gguf
 *.gguf
-__pycache__/**
+aplicação/__pycache__/**
+aplicação/**/*.pyc
+aplicação/**/*.pyo
