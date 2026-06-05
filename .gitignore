@@ -4,3 +4,8 @@ Qwen2.5.1-Coder-7B-Instruct-Q4_K_M-gguf
 aplicação/__pycache__/**
 aplicação/**/*.pyc
 aplicação/**/*.pyo
+*.sql
+*.mwb
+*.mwb.bak
+*.env
+palavras_a_apagar.txt

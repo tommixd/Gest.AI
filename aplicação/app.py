@@ -11,8 +11,7 @@ from pathlib import Path
 #vários imports ainda não utilizados mas que serão uteis para futuras funcionalidades (ex: gestão de utilizadores, autenticação, etc.)
 from flask import Flask, render_template, g, request, send_file, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from werkzeug.utils import secure_filename, generate_password_hash, check_password_hash 
+from werkzeug.utils import secure_filename 
 from functools import wraps
 from db_config import DB_CONFIG
 
@@ -51,7 +50,6 @@ TIPOS_DOCUMENTOS_PERMITIDOS = {
 }
 
 # --- CONFIGURAÇÃO DA BASE DE DADOS MYSQL ---
-# Usamos DB_CONFIG partilhado em db_config.py
 PASTA_UPLOADS = 'PastaUploadsSiteTest'
 
 # --- CONFIGURAÇÃO DA IA EM BACKGROUND ---
@@ -173,42 +171,6 @@ def obter_ano_letivo_destino(dados_formulario):
         return f"{ano_atual - 1}-{ano_atual}"
 
 
-def registar_documentos_gerados_na_bd(nome_subpasta_docente, ano_letivo, ficheiros_gerados, tipo_contratacao):
-    """Registra os documentos gerados na tabela documentos da BD."""
-    ROOT_DIR = os.path.dirname(BASE_DIR)
-    categoria = CATEGORIA_POR_TIPO.get(tipo_contratacao, "gerado")
-    versao = 1 if ano_letivo.startswith(str(datetime.now().year)) else 2
-    
-    try:
-        ligacao = mysql.connector.connect(**DB_CONFIG)
-        cursor = ligacao.cursor()
-        data_upload = datetime.now().strftime('%Y-%m-%d')
-        
-        for nome_ficheiro in ficheiros_gerados:
-            # Caminho relativo para a BD
-            caminho_relativo = os.path.join('Modelos Contratuais', 'Modelos Gerados', nome_subpasta_docente, ano_letivo, nome_ficheiro)
-            caminho_relativo = caminho_relativo.replace('\\', '/')
-            
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO documentos (nome, caminho, categoria, data_upload, versao_contrato)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (nome_ficheiro, caminho_relativo, categoria, data_upload, versao)
-                )
-                print(f"[OK] Registado na BD: {nome_ficheiro}")
-            except Exception as e:
-                print(f"[!] Erro ao registar {nome_ficheiro} na BD: {e}")
-        
-        ligacao.commit()
-        cursor.close()
-        ligacao.close()
-        print(f"[*] Documentos registados com sucesso na BD.")
-    except Exception as e:
-        print(f"[!] Erro ao conectar à BD para registo de documentos: {e}")
-
-
 def processar_templates(dados_formulario, tipo_contratacao):
     categoria_bd = CATEGORIA_POR_TIPO.get(tipo_contratacao)
     if not categoria_bd:
@@ -290,8 +252,6 @@ def processar_templates(dados_formulario, tipo_contratacao):
     if not ficheiros_gerados:
         return None, "Os templates foram encontrados mas não foi possível gerar nenhum ficheiro."
 
-    # Registar os documentos gerados na BD
-    registar_documentos_gerados_na_bd(nome_subpasta_docente, ano_letivo, ficheiros_gerados, tipo_contratacao)
 
     # Retorna o caminho completo incluindo o período
     return caminho_final, ficheiros_gerados
@@ -575,9 +535,92 @@ def submeter_contratacao():
     
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True) # <-- IMPORTANTE: tem de ser dictionary=True
+        cursor = db.cursor(dictionary=True)
         ROOT_DIR = os.path.dirname(BASE_DIR)
         
+        # ==========================================
+        # PASSO 1: RESOLVER O DOCENTE
+        # ==========================================
+        cursor.execute("SELECT id_docente FROM docentes WHERE nome = %s", (nome_docente_raw,))
+        docente_existente = cursor.fetchone()
+        
+        departamento = dados.get('departamento', dados.get('area_contratacao', 'matemática'))
+        dept_mapping = {
+            'matemática': 'matemática', 'matematica': 'matemática',
+            'física': 'física', 'fisica': 'física',
+            'gestão': 'gestão', 'gestao': 'gestão',
+            'informática': 'matemática', 'informatica': 'matemática',
+            'design': 'gestão'
+        }
+        departamento_valido = dept_mapping.get(departamento.strip().lower(), 'matemática')
+        tipo_docente_bd = 'carreira' if tipo in ['renovacao-integral', 'renovacao-parcial'] else 'contratado'
+        dados_json = json.dumps(dados)
+
+        if not docente_existente:
+            cursor.execute(
+                "INSERT INTO docentes (nome, tipo_docente, departamento, dados_historico) VALUES (%s, %s, %s, %s)",
+                (nome_docente_raw, tipo_docente_bd, departamento_valido, dados_json)
+            )
+            id_docente = cursor.lastrowid  # Captura o ID do docente acabado de criar
+        else:
+            id_docente = docente_existente['id_docente']
+            cursor.execute(
+                "UPDATE docentes SET dados_historico = %s WHERE id_docente = %s",
+                (dados_json, id_docente)
+            )
+
+        # ==========================================
+        # PASSO 2: DESCOBRIR A CARGA HORÁRIA
+        # ==========================================
+        id_da_carga = dados.get('id_carga')
+        
+        if not id_da_carga:
+            percentagem = dados.get('percentagem', 100)
+            cursor.execute("SELECT id_carga FROM carga_horaria WHERE percentagem = %s", (percentagem,))
+            resultado_carga = cursor.fetchone()
+            
+            if resultado_carga:
+                id_da_carga = resultado_carga['id_carga']
+            else:
+                cursor.execute("SELECT id_carga FROM carga_horaria LIMIT 1")
+                fallback_carga = cursor.fetchone()
+                if fallback_carga:
+                    id_da_carga = fallback_carga['id_carga']
+                else:
+                    return jsonify({"erro": "A tabela carga_horaria está vazia na BD. Insira valores de referência."}), 400
+
+        # ==========================================
+        # PASSO 3: DESCOBRIR O TEMPLATE ID
+        # ==========================================
+        # Procuramos o template que corresponde ao tipo de contrato enviado pelo formulário
+        cursor.execute("SELECT id_template FROM templates WHERE tipo_contrato = %s", (tipo,))
+        resultado_template = cursor.fetchone()
+        
+        if resultado_template:
+            id_template = resultado_template['id_template']
+        else:
+            # Fallback: Se não houver correspondência exata, apanha o primeiro template disponível
+            cursor.execute("SELECT id_template FROM templates LIMIT 1")
+            fallback_template = cursor.fetchone()
+            if fallback_template:
+                id_template = fallback_template['id_template']
+            else:
+                return jsonify({"erro": "A tabela templates está vazia na BD. Insira um template de referência."}), 400
+
+        # ==========================================
+        # PASSO 4: CRIAR O CONTRATO (COM AS TRÊS CHAVES OBRIGATÓRIAS)
+        # ==========================================
+        cursor.execute(
+            """INSERT INTO contratos 
+               (docentes_id_docente, carga_horaria_id_carga, templates_id_template, data_renovacao) 
+               VALUES (%s, %s, %s, %s)""",
+            (id_docente, id_da_carga, id_template, datetime.now().date().isoformat())
+        )
+        id_novo_contrato = cursor.lastrowid
+
+        # ==========================================
+        # PASSO 5: INSERIR OS DOCUMENTOS NA BD
+        # ==========================================
         ficheiros_gerados = os.listdir(caminho_pasta)
         documentos_inseridos = 0
         
@@ -585,41 +628,14 @@ def submeter_contratacao():
             caminho_ficheiro_absoluto = os.path.join(caminho_pasta, ficheiro)
             if os.path.isfile(caminho_ficheiro_absoluto):
                 caminho_relativo_ficheiro = os.path.relpath(caminho_ficheiro_absoluto, ROOT_DIR).replace('\\', '/')
+                
                 cursor.execute(
-                    "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (%s, %s, %s, %s)",
-                    (ficheiro, caminho_relativo_ficheiro, 'gerado', datetime.now().isoformat())
+                    """INSERT INTO documentos 
+                       (nome, caminho, categoria, data_upload, contratos_id_contrato, docentes_id_docente) 
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (ficheiro, caminho_relativo_ficheiro, 'gerado', datetime.now().isoformat(), id_novo_contrato, id_docente)
                 )
                 documentos_inseridos += 1
-        
-        # --- GUARDAR HISTÓRICO NA TABELA DOCENTES ---
-        try:
-            dados_json = json.dumps(dados) # Transforma o form todo em texto
-            cursor.execute("SELECT id_docente FROM docentes WHERE nome = %s", (nome_docente_raw,))
-            docente_existente = cursor.fetchone()
-            
-            departamento = dados.get('departamento', dados.get('area_contratacao', 'matemática'))
-            dept_mapping = {
-                'matemática': 'matemática', 'matematica': 'matemática',
-                'física': 'física', 'fisica': 'física',
-                'gestão': 'gestão', 'gestao': 'gestão',
-                'informática': 'matemática', 'informatica': 'matemática',
-                'design': 'gestão'
-            }
-            departamento_valido = dept_mapping.get(departamento.strip().lower(), 'matemática')
-            tipo_docente_bd = 'carreira' if tipo in ['renovacao-integral', 'renovacao-parcial'] else 'contratado'
-
-            if not docente_existente:
-                cursor.execute(
-                    "INSERT INTO docentes (nome, tipo_docente, departamento, dados_historico) VALUES (%s, %s, %s, %s)",
-                    (nome_docente_raw, tipo_docente_bd, departamento_valido, dados_json)
-                )
-            else:
-                cursor.execute(
-                    "UPDATE docentes SET dados_historico = %s WHERE id_docente = %s",
-                    (dados_json, docente_existente['id_docente'])
-                )
-        except Exception as err:
-            print(f"[!] Erro ao registar docente/historico na BD: {err}")
         
         if rascunho_id:
             cursor.execute("DELETE FROM rascunhos WHERE id = %s", (rascunho_id,))
@@ -628,7 +644,7 @@ def submeter_contratacao():
         cursor.close()
         
         return jsonify({
-            "mensagem": f"Sucesso: {documentos_inseridos} documentos gerados.", 
+            "mensagem": f"Sucesso: {documentos_inseridos} documentos gerados e registados.", 
             "pasta": caminho_pasta,
             "ficheiros": ficheiros_gerados
         }), 200
@@ -636,6 +652,7 @@ def submeter_contratacao():
     except Exception as e:
         print(f"[!] Erro ao registar na BD: {e}")
         return jsonify({"erro": f"Erro BD: {e}"}), 500
+
 
 @app.route('/guardar-rascunho', methods=['POST'])
 def rota_guardar_rascunho():
