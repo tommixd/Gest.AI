@@ -147,15 +147,7 @@ CREATE TABLE `docentes` (
   CONSTRAINT `fk_docentes_contratos` FOREIGN KEY (`id_contrato`) REFERENCES `contratos` (`id_contrato`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
 
-LOCK TABLES `docentes` WRITE;
-/*!40000 ALTER TABLE `docentes` DISABLE KEYS */;
-INSERT INTO `docentes` VALUES
-  (1,'João Manel','carreira','matemática',NULL),
-  (2,'Henrique Dias','contratado','física',NULL),
-  (3,'José Lousado','contratado','matemática',NULL),
-  (4,'Ricardo Gama','carreira','física',NULL);
-/*!40000 ALTER TABLE `docentes` ENABLE KEYS */;
-UNLOCK TABLES;
+
 
 --
 -- Table structure for table `detalhes_contratados`
@@ -254,24 +246,6 @@ INSERT INTO `documentos` VALUES
   (6,'Lista verificação_Assistente convidado_TP.docx','pdfs_teste/Lista verificação_Assistente convidado_TP.docx','pdf_llm','2026-05-06 12:11:06',NULL,1),
   (7,'Lista verificação_Prof adjunto_TI.docx','pdfs_teste/Lista verificação_Prof adjunto_TI.docx','pdf_llm','2026-05-06 12:11:06',NULL,1),
   (8,'Lista verificação_Prof adjunto_TP.docx','pdfs_teste/Lista verificação_Prof adjunto_TP.docx','pdf_llm','2026-05-06 12:11:06',NULL,1),
-  (9,'1. Necessidade da área_TP.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/1. Necessidade da área_TP.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (10,'2 .Necessidade de contratação_ Juri.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/2 .Necessidade de contratação_ Juri.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (11,'3.  Proposta do Juri.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/3.  Proposta do Juri.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (12,'4. DISPENSA DE CONSTIT DE BOLSA RECRUTA.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/4. DISPENSA DE CONSTIT DE BOLSA RECRUTA.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (13,'5. Proposta de contratação final.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/5. Proposta de contratação final.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (14,'Ficha de serviço atribuido.docx','Modelos Contratuais/Modelos Gerados/Contrato_Beatriz_Guedes/Ficha de serviço atribuido.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (15,'1. Necessidade da área.docx','Modelos Contratuais/Modelos Gerados/Contrato_Helena_Pinto/1. Necessidade da área.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (16,'2. Proposta de contratação final.docx','Modelos Contratuais/Modelos Gerados/Contrato_Helena_Pinto/2. Proposta de contratação final.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (17,'3.  Relatório_Juri.docx','Modelos Contratuais/Modelos Gerados/Contrato_Helena_Pinto/3.  Relatório_Juri.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (18,'Ficha de serviço atribuido.docx','Modelos Contratuais/Modelos Gerados/Contrato_Helena_Pinto/Ficha de serviço atribuido.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (19,'1. Necessidade da área.docx','Modelos Contratuais/Modelos Gerados/Contrato_João_Silva/1. Necessidade da área.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (20,'2. Proposta de contratação final.docx','Modelos Contratuais/Modelos Gerados/Contrato_João_Silva/2. Proposta de contratação final.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (21,'3.  Relatório_Juri.docx','Modelos Contratuais/Modelos Gerados/Contrato_João_Silva/3.  Relatório_Juri.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (22,'Ficha de serviço atribuido.docx','Modelos Contratuais/Modelos Gerados/Contrato_João_Silva/Ficha de serviço atribuido.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (23,'1. Necessidade da área.docx','Modelos Contratuais/Modelos Gerados/Contrato_Maria_Antónia/1. Necessidade da área.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (24,'2. Proposta de contratação final.docx','Modelos Contratuais/Modelos Gerados/Contrato_Maria_Antónia/2. Proposta de contratação final.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (25,'3.  Relatório_Juri.docx','Modelos Contratuais/Modelos Gerados/Contrato_Maria_Antónia/3.  Relatório_Juri.docx','gerado','2026-05-06 12:11:06',NULL,1),
-  (26,'Ficha de serviço atribuido.docx','Modelos Contratuais/Modelos Gerados/Contrato_Maria_Antónia/Ficha de serviço atribuido.docx','gerado','2026-05-06 12:11:06',NULL,1),
   (27,'1. Necessidade da área.docx','Modelos Contratuais/tempo integral anual/1. Necessidade da área.docx','tempo integral anual','2026-05-06 12:11:06',NULL,1),
   (28,'2. Proposta de contratação final.docx','Modelos Contratuais/tempo integral anual/2. Proposta de contratação final.docx','tempo integral anual','2026-05-06 12:11:06',NULL,1),
   (29,'3.  Relatório_Juri.docx','Modelos Contratuais/tempo integral anual/3.  Relatório_Juri.docx','tempo integral anual','2026-05-06 12:11:06',NULL,1),
@@ -306,11 +280,7 @@ CREATE TABLE `rascunhos` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
 
-LOCK TABLES `rascunhos` WRITE;
-/*!40000 ALTER TABLE `rascunhos` DISABLE KEYS */;
-INSERT INTO `rascunhos` VALUES (1,'Prof. Dr. Tomás Monteiro','renovacao-integral','{"tipo": "renovacao-integral", "tipo_contrato": "renovacao-integral", "nome_docente": "Prof. Dr. Tom\u00e1s Monteiro", "data_inicio_contrato": "", "data_fim_contrato": "", "ano_letivo": "", "ano_anterior": "", "area_contratacao": "", "areas_curriculares": "", "funcoes_externas": "N\u00e3o exerce fun\u00e7\u00f5es externas", "profAAA": "", "profBBB": "", "profCCC": "", "profDDD": "", "profXXX": "", "uc_1": "", "horas_1": "", "curso_1": "", "ciclo_1": "", "uc_2": "", "horas_2": "", "curso_2": "", "ciclo_2": "", "total_horas_contacto": "", "relatorio_juri": ""}','2026-05-06 12:35:00');
-/*!40000 ALTER TABLE `rascunhos` ENABLE KEYS */;
-UNLOCK TABLES;
+
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

@@ -13,16 +13,36 @@ import mysql.connector
 from db_config import DB_CONFIG
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
+BASE_DIR  = Path(os.path.abspath(__file__)).parent   # .../Gest.AI/Aplicação
+ROOT_DIR  = BASE_DIR.parent                           # .../Gest.AI
 
 
 def _resolver_caminho(caminho_db: str) -> str | None:
-    """Tenta resolver o caminho do ficheiro a partir da raiz ou do diretório base."""
+    """
+    Resolve o caminho do ficheiro no disco a partir do caminho relativo
+    guardado na BD. Tenta várias bases e, como fallback, faz uma pesquisa
+    fuzzy pelo nome do ficheiro dentro de ROOT_DIR.
+    """
+    # Normaliza separadores (a BD guarda com '/', Windows usa '\')
+    caminho_norm = Path(caminho_db)
+
+    # Tentativa 1 e 2: join direto com ROOT_DIR e BASE_DIR
     for base in [ROOT_DIR, BASE_DIR]:
-        caminho = os.path.join(base, caminho_db).replace("\\", "/")
-        if os.path.exists(caminho):
-            return caminho
+        candidato = base / caminho_norm
+        if candidato.exists():
+            return str(candidato)
+
+    # Tentativa 3: fallback fuzzy — procura o ficheiro pelo nome dentro de ROOT_DIR
+    # Útil quando o caminho na BD está ligeiramente errado mas o ficheiro existe
+    nome_ficheiro = caminho_norm.name
+    for ficheiro in ROOT_DIR.rglob(nome_ficheiro):
+        # Verifica se pelo menos a pasta pai bate certo (evita falsos positivos
+        # quando há vários ficheiros com o mesmo nome, ex: "Ficha de serviço atribuido.docx")
+        pasta_bd   = caminho_norm.parent.name.lower()
+        pasta_real = ficheiro.parent.name.lower()
+        if pasta_bd == pasta_real:
+            return str(ficheiro)
+
     return None
 
 
