@@ -440,7 +440,7 @@ def docente_detalhes():
             detalhes["tipo_docente"] = docente["tipo_docente"]
             detalhes["departamento"] = docente["departamento"]
             
-            # MAGIA: Se tiver histórico guardado, carrega TUDO (UCs, Juris, Áreas, etc.)
+            # Se tiver histórico guardado, carrega TUDO (UCs, Juris, Áreas, etc.)
             if docente.get("dados_historico"):
                 historico = json.loads(docente["dados_historico"])
                 for chave, valor in historico.items():
@@ -975,6 +975,7 @@ def apagar_pasta(caso):
         return jsonify({"sucesso": False, "erro": str(e)}), 500
         
 
+#esta rita está inutilizada
 #@app.route('/importar-historico')
 #def importar_historico():
 #    return render_template('importar.html')
