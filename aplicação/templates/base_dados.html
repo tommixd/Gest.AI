@@ -179,72 +179,57 @@
                     td.style.borderTop = '1px solid var(--border)';
                     
                     let cellText = row[h] !== null ? String(row[h]) : '';
-                    
-                    // DEBUG
-                    if (h === 'DADOS_HISTORICO') {
-                        console.log(`[HEADER: ${h}] length: ${cellText.length}`);
-                    }
-                    
+
+                    // always expose metadata for the cell
+                    td.dataset.col = h;
+                    td.dataset.id = row[pk_col];
+
+                    // primary key column: center and not editable
                     if (h === pk_col) {
-                        // O ID fica centrado e não editável
                         td.style.textAlign = 'center';
-                        td.style.fontWeight = '500';
-                        td.style.color = 'var(--text-muted)';
-                        td.textContent = cellText;
-                    } 
-                    // FILTRO: Truncate para colunas problemáticas (dados_historico, dados_historicos, etc)
-                    else if (h.toLowerCase().includes('dados_historico') && cellText.length > 0) {
-                        console.log(`[BUTTON CREATED] for ${h}`);
-                        // Criar botão e adicionar listener
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-ui';
-                        btn.style.padding = '6px 12px';
-                        btn.style.fontSize = '0.8rem';
-                        btn.style.background = 'var(--btn-draft-bg)';
-                        btn.style.color = 'var(--primary)';
-                        btn.textContent = '👁️ Ver Dados';
-                        btn.type = 'button';
-                        
-                        // Armazenar os dados no dataset do botão
-                        btn.dataset.conteudo = cellText;
-                        
-                        btn.addEventListener('click', function() {
-                            mostrarConteudo(this.dataset.conteudo);
-                        });
-                        
-                        td.appendChild(btn);
-                        td.style.textAlign = 'center';
-                        td.contentEditable = "false";
-                    } 
-                    else if (cellText.length > 100) {
-                        console.log(`[LONG TEXT] ${cellText.substring(0, 30)}... (${cellText.length} chars)`);
-                        // Conteúdo muito longo também mostra o botão
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-ui';
-                        btn.style.padding = '6px 12px';
-                        btn.style.fontSize = '0.8rem';
-                        btn.style.background = 'var(--btn-draft-bg)';
-                        btn.style.color = 'var(--primary)';
-                        btn.textContent = '👁️ Ver Dados';
-                        btn.type = 'button';
-                        
-                        btn.dataset.conteudo = cellText;
-                        
-                        btn.addEventListener('click', function() {
-                            mostrarConteudo(this.dataset.conteudo);
-                        });
-                        
-                        td.appendChild(btn);
-                        td.style.textAlign = 'center';
-                        td.contentEditable = "false";
-                    } 
-                    else {
-                        // O resto fica normal e editável
-                        td.className = 'editable-cell';
-                        td.contentEditable = "false"; // Bloqueado por defeito (só ativa no Modo Edição)
-                        td.textContent = cellText;
-                        td.onblur = function() { saveCell(table, pk_col, row[pk_col], h, this.textContent); };
+                        td.textContent = cellText || '';
+                    } else {
+                        // Se for conteúdo longo (ex: JSON), trunca e mostra botão "Ver"
+                        if (cellText.length > 80) {
+                            const preview = document.createElement('span');
+                            preview.style.cssText = 'color: var(--text-muted); font-style: italic; font-size: 0.85rem;';
+                            preview.textContent = cellText.substring(0, 60) + '…';
+
+                            const btnVer = document.createElement('button');
+                            btnVer.textContent = 'Ver';
+                            btnVer.style.cssText = 'margin-left:8px; padding:2px 8px; border-radius:4px; border:1px solid var(--primary); background:transparent; color:var(--primary); cursor:pointer; font-size:0.8rem;';
+                            btnVer.addEventListener('click', () => mostrarConteudo(cellText));
+
+                            td.appendChild(preview);
+                            td.appendChild(btnVer);
+                            td.contentEditable = "false";
+                        } else {
+                            td.textContent = cellText || '';
+
+                            // mark editable cells and enable/disable based on current edit mode
+                            td.classList.add('editable-cell');
+                            td.contentEditable = document.body.classList.contains('edit-mode') ? "true" : "false";
+
+                            // persist changes on blur
+                            td.addEventListener('blur', async (e) => {
+                                const newVal = e.target.textContent;
+                                const oldVal = row[h] !== null ? String(row[h]) : '';
+                                if (newVal !== oldVal) {
+                                    await saveCell(table, pk_col, row[pk_col], h, newVal);
+                                    row[h] = newVal;
+                                }
+                            });
+
+                            // allow Enter to finish editing
+                            td.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.target.blur();
+                                }
+                            });
+                        }
                     }
+                    
                     tr.appendChild(td);
                 });
                 
@@ -312,29 +297,22 @@
 
     // Função para abrir e formatar o conteúdo (JSON ou texto longo)
     function mostrarConteudo(conteudoString) {
+        let formatado;
         try {
-            // Tenta converter o texto num objeto JSON para formatar com espaços
-            let formatado;
-            try {
-                const obj = JSON.parse(conteudoString);
-                formatado = JSON.stringify(obj, null, 4);
-            } catch(e) {
-                // Se não for JSON válido, usa o texto como está
-                formatado = conteudoString;
-            }
-            
-            // Abre uma janela com o conteúdo formatado
-            const win = window.open("", "_blank", "width=700,height=800");
-            win.document.write(`
-                <body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;">
-                    <h2 style="margin-top: 0; color: #4fc3f7;">Conteúdo Completo</h2>
-                    <pre style="font-size: 13px; max-height: 600px; overflow: auto; background: #252526; padding: 15px; border-radius: 6px; border: 1px solid #3e3e42; white-space: pre-wrap; word-wrap: break-word;">${formatado.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
-                    <button onclick="window.close()" style="padding: 8px 16px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-family: 'Outfit', sans-serif;">Fechar</button>
-                </body>
-            `);
+            const obj = JSON.parse(conteudoString);
+            formatado = JSON.stringify(obj, null, 4);
         } catch(e) {
-            alert("Erro ao mostrar dados: " + e);
+            formatado = conteudoString;
         }
+
+        const win = window.open("", "_blank", "width=700,height=800");
+        win.document.write(`
+            <body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;">
+                <h2 style="margin-top: 0; color: #4fc3f7;">Conteúdo Completo</h2>
+                <pre style="font-size: 13px; max-height: 600px; overflow: auto; background: #252526; padding: 15px; border-radius: 6px; border: 1px solid #3e3e42; white-space: pre-wrap; word-wrap: break-word;">${formatado.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+                <button onclick="window.close()" style="padding: 8px 16px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Fechar</button>
+            </body>
+        `);
     }
 </script>
 {% endblock %}

@@ -42,6 +42,62 @@ except ImportError:
 app = Flask(__name__)
 app.config["SITE_NAME"] = "Gest.AI"  
 
+
+LABELS_HISTORICO = {
+    #id de contrato
+    "tipo" : "Tipo de Processo",
+    "tipo_contrato":         "Tipo de Contrato",
+    "nome_docente":          "Nome do Docente",
+    "ano_letivo":            "Ano Letivo",
+    "ano_anterior":          "Ano Anterior",
+    "data_inicio_contrato":  "Data de Início",
+    "data_fim_contrato":     "Data de Fim",
+    #dados académicos
+    "area_contratacao":      "Área de Contratação",
+    "areas_curriculares":    "Áreas Curriculares",
+    "departamento":          "Departamento",
+    "tipo_docente":          "Tipo de Docente",
+    "funcoes_externas":      "Funções Externas",
+    # Carga horária
+    "total_horas_contacto":  "Total de Horas de Contacto",
+    "horario_semanal":       "Horário Semanal",
+    # Júri
+    "profAAA":               "Membro do Júri A",
+    "profBBB":               "Membro do Júri B",
+    "profCCC":               "Membro do Júri C",
+    "profDDD":               "Membro do Júri D",
+    "profXXX":               "Presidente do Júri / Diretor",
+    # Observações
+    "relatorio_juri":        "Relatório / Observações",
+}
+
+#chaves internars que não devem aparecer na ui
+CHAVES_OCULTAS = {"tipo", "tipo_contrato", "rascunho_id"}
+
+@app.template_filter('historico_legivel')
+def historico_legisvel(valor):
+    """Converte o json do historico num bloco html legivel para o user"""
+
+    import re
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except Exception:
+            return valor # se falhar devolve a string como estava
+    if not isinstance(valor, dict):
+        return str(valor) # se não for um dict, devolve como estava
+    
+    linhas = []
+    for chave, val in valor.items():
+        if not val or chave in CHAVES_OCULTAS:
+            continue
+        label = LABELS_HISTORICO.get(chave)
+        if not label:
+            label = re.sub(r'_', ' ', chave).title()
+        linhas.append(f'<div class="hist-linha"><span class="hist-label">{label}</span><span class="hist-valor">{val}</span></div>')
+
+    return '\n'.join(linhas)
+
 # Tipos de contratos mostrados na página de documentos
 TIPOS_DOCUMENTOS_PERMITIDOS = {
     'tempo integral anual',
