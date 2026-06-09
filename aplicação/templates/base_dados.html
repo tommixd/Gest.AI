@@ -54,7 +54,30 @@
     
     /* Esconder colunas inteiras (cabeçalho e células) */
     .edit-only { display: none !important; }
-    body.edit-mode .edit-only { display: table-cell !important; } /* Mudou de inline-flex para table-cell */
+    body.edit-mode .edit-only { display: table-cell !important; }
+
+    /* Novos estilos para Consulta */
+    .search-panel { background: var(--panel-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+    .search-field { display: flex; flex-direction: column; gap: 5px; }
+    .search-field label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+    .search-field input, .search-field select { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+    
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
+    .modal-content { background: var(--panel-bg); margin: 5% auto; padding: 30px; border-radius: 15px; width: 80%; max-width: 900px; border: 1px solid var(--border); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .close-modal { font-size: 28px; cursor: pointer; color: var(--text-muted); }
+    
+    .detail-section { margin-bottom: 25px; }
+    .detail-section h3 { font-family: 'DM Serif Display'; color: var(--primary); border-bottom: 2px solid var(--primary); display: inline-block; margin-bottom: 15px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+    .info-item { background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+    .info-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; display: block; }
+    .info-value { font-size: 1rem; color: var(--text); }
+    
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 20px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--text-muted); }
+    .tab.active { border-bottom-color: var(--primary); color: var(--primary); font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -63,44 +86,295 @@
     
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h1 style="font-family: 'DM Serif Display'; margin: 0; color: var(--title-color);">Explorador de Base de Dados</h1>
-        <button id="edit-toggle-btn" class="btn-ui" onclick="toggleEditMode()">Editar</button>
-    </div>
-
-    <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
-        <select id="select-tabelas" onchange="carregarTabela()" style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
-            <option value="">-- Escolha uma tabela --</option>
-        </select>
-        
-        <input type="text" id="search-input" oninput="filtrarTabela()" placeholder="🔍 Pesquisar na tabela..." style="flex: 3; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
-        
-        <div class="edit-only">
-            <button class="btn-add-row" onclick="adicionarLinha()">+ Nova Linha</button>
+        <div style="display: flex; gap: 10px;">
+            <button id="view-mode-btn" class="btn-ui" onclick="switchView('consulta')">Consulta Avançada</button>
+            <button id="table-mode-btn" class="btn-ui" style="background: var(--text-muted);" onclick="switchView('tabelas')">Ver Tabelas</button>
+            <button id="edit-toggle-btn" class="btn-ui" style="display:none;" onclick="toggleEditMode()">Editar</button>
         </div>
     </div>
 
-    <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px var(--shadow);">
-        <table id="tabela-dados" style="width: 100%; border-collapse: collapse;">
-            <thead id="tabela-head" style="background: var(--hover-bg);"></thead>
-            <tbody id="tabela-body"></tbody>
-        </table>
+    <!-- MODO CONSULTA -->
+    <div id="view-consulta">
+        <div class="search-panel">
+            <div class="search-grid">
+                <div class="search-field">
+                    <label>Nome do Docente</label>
+                    <input type="text" id="query-nome" placeholder="Ex: João Silva" oninput="consultarDocentes()">
+                </div>
+                <div class="search-field">
+                    <label>Departamento</label>
+                    <select id="query-dept" onchange="consultarDocentes()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="search-field">
+                    <label>Tipo de Contrato</label>
+                    <select id="query-tipo" onchange="consultarDocentes()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="search-field">
+                    <label>Ano Letivo</label>
+                    <select id="query-ano" onchange="consultarDocentes()">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px var(--shadow);">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: var(--hover-bg);">
+                    <tr>
+                        <th style="padding: 15px 20px; text-align: left; color: var(--text-muted); font-size: 0.85rem;">DOCENTE</th>
+                        <th style="padding: 15px 20px; text-align: left; color: var(--text-muted); font-size: 0.85rem;">DEPARTAMENTO</th>
+                        <th style="padding: 15px 20px; text-align: left; color: var(--text-muted); font-size: 0.85rem;">TIPO</th>
+                        <th style="padding: 15px 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; width: 100px;">AÇÕES</th>
+                    </tr>
+                </thead>
+                <tbody id="consulta-results">
+                    <tr><td colspan="4" style="padding: 30px; text-align: center; color: var(--text-muted);">Use os filtros acima para pesquisar...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODO TABELAS (Original) -->
+    <div id="view-tabelas" style="display: none;">
+        <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+            <select id="select-tabelas" onchange="carregarTabela()" style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+                <option value="">-- Escolha uma tabela --</option>
+            </select>
+            
+            <input type="text" id="search-input" oninput="filtrarTabela()" placeholder="🔍 Pesquisar na tabela..." style="flex: 3; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            
+            <div class="edit-only">
+                <button class="btn-add-row" onclick="adicionarLinha()">+ Nova Linha</button>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px var(--shadow);">
+            <table id="tabela-dados" style="width: 100%; border-collapse: collapse;">
+                <thead id="tabela-head" style="background: var(--hover-bg);"></thead>
+                <tbody id="tabela-body"></tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<!-- MODAL DE DETALHE -->
+<div id="modal-docente" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-nome-docente" style="font-family: 'DM Serif Display'; margin: 0; color: var(--primary);">Detalhes do Docente</h2>
+            <span class="close-modal" onclick="fecharModal()">&times;</span>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tab-pessoais', this)">Dados Pessoais</div>
+            <div class="tab" onclick="switchTab('tab-contratos', this)">Contratos e Carga</div>
+            <div class="tab" onclick="switchTab('tab-documentos', this)">Documentos</div>
+            <div class="tab" onclick="switchTab('tab-rascunhos', this)">Rascunhos</div>
+        </div>
+
+        <div id="tab-pessoais" class="tab-content detail-section">
+            <div class="info-grid" id="detalhe-pessoais"></div>
+        </div>
+
+        <div id="tab-contratos" class="tab-content detail-section" style="display:none;">
+            <div id="detalhe-contratos"></div>
+        </div>
+
+        <div id="tab-documentos" class="tab-content detail-section" style="display:none;">
+            <div id="detalhe-documentos"></div>
+        </div>
+
+        <div id="tab-rascunhos" class="tab-content detail-section" style="display:none;">
+            <div id="detalhe-rascunhos"></div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // 1. Carregar lista de tabelas
+    let currentView = 'consulta';
+
+    // 1. Inicialização
     window.onload = async () => {
-        const res = await fetch('/api/lista-tabelas');
-        const data = await res.json();
+        // Carregar tabelas (para o modo original)
+        const resTab = await fetch('/api/lista-tabelas');
+        const dataTab = await resTab.json();
         const select = document.getElementById('select-tabelas');
-        data.tabelas.forEach(t => {
+        dataTab.tabelas.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t;
             opt.textContent = t.toUpperCase();
             select.appendChild(opt);
         });
+
+        // Carregar filtros (para o modo consulta)
+        const resFiltros = await fetch('/api/filtros-disponiveis');
+        const filtros = await resFiltros.json();
+        
+        const populateSelect = (id, list) => {
+            const s = document.getElementById(id);
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                s.appendChild(opt);
+            });
+        };
+
+        populateSelect('query-dept', filtros.departamentos);
+        populateSelect('query-tipo', filtros.tipos_contrato);
+        populateSelect('query-ano', filtros.anos_letivos);
+        
+        // Carregar resultados iniciais
+        consultarDocentes();
     };
+
+    function switchView(view) {
+        currentView = view;
+        document.getElementById('view-consulta').style.display = view === 'consulta' ? 'block' : 'none';
+        document.getElementById('view-tabelas').style.display = view === 'tabelas' ? 'block' : 'none';
+        document.getElementById('edit-toggle-btn').style.display = view === 'tabelas' ? 'block' : 'none';
+        
+        document.getElementById('view-mode-btn').style.background = view === 'consulta' ? 'var(--primary)' : 'var(--text-muted)';
+        document.getElementById('table-mode-btn').style.background = view === 'tabelas' ? 'var(--primary)' : 'var(--text-muted)';
+    }
+
+    // --- LÓGICA DE CONSULTA ---
+
+    async function consultarDocentes() {
+        const nome = document.getElementById('query-nome').value;
+        const dept = document.getElementById('query-dept').value;
+        const tipo = document.getElementById('query-tipo').value;
+        const ano = document.getElementById('query-ano').value;
+
+        const params = new URLSearchParams({ nome, departamento: dept, tipo_contrato: tipo, ano_letivo: ano });
+        const res = await fetch(`/api/consulta-docentes?${params.toString()}`);
+        const data = await res.json();
+        
+        const tbody = document.getElementById('consulta-results');
+        tbody.innerHTML = '';
+
+        if (data.docentes && data.docentes.length > 0) {
+            data.docentes.forEach(doc => {
+                const tr = document.createElement('tr');
+                tr.style.borderTop = '1px solid var(--border)';
+                // isJuri na BD é "sim" ou "não". Apenas carreira pode ser júri.
+                const isRealJuri = doc.isJuri === 'sim' && doc.tipo_docente === 'carreira';
+                const juriBadge = isRealJuri ? `<span style="background: #34c759; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">JÚRI</span>` : '';
+                tr.innerHTML = `
+                    <td style="padding: 15px 20px; font-weight: 600;">${doc.nome} ${juriBadge}</td>
+                    <td style="padding: 15px 20px;">${doc.departamento || '---'}</td>
+                    <td style="padding: 15px 20px;"><span style="background: var(--hover-bg); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${doc.tipo_docente || '---'}</span></td>
+                    <td style="padding: 15px 20px; text-align: center;">
+                        <button class="btn-ui" style="padding: 5px 12px; font-size: 0.8rem;" onclick="verDetalheDocente(${doc.id_docente})">Ver Tudo</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" style="padding: 30px; text-align: center; color: var(--text-muted);">Nenhum docente encontrado com estes filtros.</td></tr>';
+        }
+    }
+
+    async function verDetalheDocente(id) {
+        const res = await fetch(`/api/detalhe-docente/${id}`);
+        const data = await res.json();
+        
+        if (data.erro) { alert(data.erro); return; }
+
+        const d = data.docente;
+        document.getElementById('modal-nome-docente').textContent = d.nome;
+        
+        // Dados Pessoais
+        const pessoais = document.getElementById('detalhe-pessoais');
+        const displayJuri = (d.isJuri === 'sim' && d.tipo_docente === 'carreira') ? 'Sim' : 'Não';
+        pessoais.innerHTML = `
+            <div class="info-item"><span class="info-label">Nome Completo</span><span class="info-value">${d.nome}</span></div>
+            <div class="info-item"><span class="info-label">Departamento</span><span class="info-value">${d.departamento}</span></div>
+            <div class="info-item"><span class="info-label">Tipo de Docente</span><span class="info-value">${d.tipo_docente}</span></div>
+            <div class="info-item"><span class="info-label">Membro de Júri?</span><span class="info-value">${displayJuri}</span></div>
+        `;
+        
+        if (d.historico_json) {
+            Object.entries(d.historico_json).forEach(([key, val]) => {
+                if (val && typeof val !== 'object') {
+                    pessoais.innerHTML += `<div class="info-item"><span class="info-label">${key.replace(/_/g, ' ')}</span><span class="info-value">${val}</span></div>`;
+                }
+            });
+        }
+
+        // Contratos
+        const contratosDiv = document.getElementById('detalhe-contratos');
+        if (data.contratos.length > 0) {
+            contratosDiv.innerHTML = data.contratos.map(c => `
+                <div style="background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <strong style="color: var(--primary);">${c.tipo_legivel || 'Contrato'}</strong>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">${c.ano_letivo || c.data_renovacao || 'Sem data'}</span>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">Percentagem</span><span class="info-value">${c.percentagem}%</span></div>
+                        <div class="info-item"><span class="info-label">Horas Aulas</span><span class="info-value">${c.tempo_aulas}h</span></div>
+                        <div class="info-item"><span class="info-label">Horas Total</span><span class="info-value">${c.tempo_contratual}h</span></div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            contratosDiv.innerHTML = '<p style="color: var(--text-muted);">Nenhum contrato registado.</p>';
+        }
+
+        // Documentos
+        const docsDiv = document.getElementById('detalhe-documentos');
+        if (data.documentos.length > 0) {
+            docsDiv.innerHTML = `<ul style="list-style: none; padding: 0;">` + 
+                data.documentos.map(doc => `
+                    <li style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <span>📄 ${doc.nome} <small style="color: var(--text-muted);">(${doc.categoria})</small></span>
+                        <a href="/ver_documento/${doc.id}" target="_blank" class="btn-ui" style="padding: 4px 10px; font-size: 0.75rem; text-decoration: none;">Abrir</a>
+                    </li>
+                `).join('') + `</ul>`;
+        } else {
+            docsDiv.innerHTML = '<p style="color: var(--text-muted);">Nenhum documento gerado.</p>';
+        }
+
+        // Rascunhos
+        const rascunhosDiv = document.getElementById('detalhe-rascunhos');
+        if (data.rascunhos.length > 0) {
+            rascunhosDiv.innerHTML = data.rascunhos.map(r => `
+                <div style="background: var(--bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${r.tipo_contrato}</strong><br>
+                        <small style="color: var(--text-muted);">Guardado em: ${r.data_guardado}</small>
+                    </div>
+                    <button class="btn-ui" style="padding: 4px 10px; font-size: 0.75rem;" onclick="alert('Funcionalidade de retomar rascunho em desenvolvimento')">Retomar</button>
+                </div>
+            `).join('');
+        } else {
+            rascunhosDiv.innerHTML = '<p style="color: var(--text-muted);">Nenhum rascunho pendente.</p>';
+        }
+
+        document.getElementById('modal-docente').style.display = 'block';
+    }
+
+    function fecharModal() {
+        document.getElementById('modal-docente').style.display = 'none';
+    }
+
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        el.classList.add('active');
+    }
+
+    // --- LÓGICA ORIGINAL DE TABELAS ---
 
     // 2. Modo Edição (Toggle)
     function toggleEditMode() {
@@ -112,7 +386,6 @@
         atualizarCelulasEditaveis();
     }
 
-    // Nova função para bloquear/desbloquear a escrita
     function atualizarCelulasEditaveis() {
         const isEdit = document.body.classList.contains('edit-mode');
         document.querySelectorAll('.editable-cell').forEach(cell => {
@@ -135,123 +408,78 @@
 
         if (data.dados && data.dados.length > 0) {
             const headers = Object.keys(data.dados[0]);
-            const pk_col = headers[0]; // A primeira coluna é o ID
+            const pk_col = headers.find(h => h.startsWith('id')) || headers[0];
 
-            // --- CABEÇALHOS ---
             const trHead = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
                 th.style.padding = '15px 20px';
-                th.textContent = h.toUpperCase(); // Fica mais profissional em maiúsculas
+                th.textContent = h.toUpperCase();
                 th.style.color = 'var(--text-muted)';
                 th.style.fontSize = '0.85rem';
-                th.style.letterSpacing = '0.5px';
-                
-                // Formatação específica para o ID
-                if (h === pk_col) {
-                    th.style.width = '5%';
-                    th.style.textAlign = 'center';
-                } else {
-                    th.style.textAlign = 'left';
-                }
+                th.style.textAlign = (h === pk_col) ? 'center' : 'left';
                 trHead.appendChild(th);
             });
             
-            // Cabeçalho de Ações (Escondido por defeito com 'edit-only')
             const thAction = document.createElement('th');
             thAction.textContent = 'AÇÕES';
             thAction.className = 'edit-only';
             thAction.style.padding = '15px 20px';
-            thAction.style.width = '8%';
             thAction.style.textAlign = 'center';
-            thAction.style.color = 'var(--text-muted)';
-            thAction.style.fontSize = '0.85rem';
             trHead.appendChild(thAction);
             thead.appendChild(trHead);
 
-            // --- LINHAS ---
             data.dados.forEach(row => {
                 const tr = document.createElement('tr');
-                
                 headers.forEach(h => {
                     const td = document.createElement('td');
                     td.style.padding = '15px 20px';
                     td.style.borderTop = '1px solid var(--border)';
                     
                     let cellText = row[h] !== null ? String(row[h]) : '';
-
-                    // always expose metadata for the cell
                     td.dataset.col = h;
                     td.dataset.id = row[pk_col];
 
-                    // primary key column: center and not editable
                     if (h === pk_col) {
                         td.style.textAlign = 'center';
-                        td.textContent = cellText || '';
+                        td.textContent = cellText;
                     } else {
-                        // Se for conteúdo longo (ex: JSON), trunca e mostra botão "Ver"
                         if (cellText.length > 80) {
                             const preview = document.createElement('span');
                             preview.style.cssText = 'color: var(--text-muted); font-style: italic; font-size: 0.85rem;';
                             preview.textContent = cellText.substring(0, 60) + '…';
-
                             const btnVer = document.createElement('button');
                             btnVer.textContent = 'Ver';
                             btnVer.style.cssText = 'margin-left:8px; padding:2px 8px; border-radius:4px; border:1px solid var(--primary); background:transparent; color:var(--primary); cursor:pointer; font-size:0.8rem;';
                             btnVer.addEventListener('click', () => mostrarConteudo(cellText));
-
                             td.appendChild(preview);
                             td.appendChild(btnVer);
-                            td.contentEditable = "false";
                         } else {
-                            td.textContent = cellText || '';
-
-                            // mark editable cells and enable/disable based on current edit mode
+                            td.textContent = cellText;
                             td.classList.add('editable-cell');
                             td.contentEditable = document.body.classList.contains('edit-mode') ? "true" : "false";
-
-                            // persist changes on blur
                             td.addEventListener('blur', async (e) => {
                                 const newVal = e.target.textContent;
-                                const oldVal = row[h] !== null ? String(row[h]) : '';
-                                if (newVal !== oldVal) {
+                                if (newVal !== cellText) {
                                     await saveCell(table, pk_col, row[pk_col], h, newVal);
-                                    row[h] = newVal;
-                                }
-                            });
-
-                            // allow Enter to finish editing
-                            td.addEventListener('keydown', (e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    e.target.blur();
                                 }
                             });
                         }
                     }
-                    
                     tr.appendChild(td);
                 });
                 
-                // Célula de Ações (edit-only)
                 const tdAction = document.createElement('td');
                 tdAction.className = 'edit-only';
                 tdAction.style.borderTop = '1px solid var(--border)';
                 tdAction.style.textAlign = 'center';
                 tdAction.innerHTML = `<button class="btn-delete-row" style="margin: 0 auto;" onclick="apagarLinha('${table}', '${pk_col}', '${row[pk_col]}')">-</button>`;
                 tr.appendChild(tdAction);
-                
                 tbody.appendChild(tr);
             });
-            
-            // Garantir que o modo edição atualiza as células novas
-            atualizarCelulasEditaveis();
-        } else {
-            tbody.innerHTML = `<tr><td colspan="100%" style="padding:30px; text-align:center; color: var(--text-muted);">A tabela '${table}' está vazia. Clique em Editar para adicionar linhas.</td></tr>`;
         }
     }
 
-    // 4. Funções de CRUD
     async function adicionarLinha() {
         const table = document.getElementById('select-tabelas').value;
         await fetch('/api/adicionar-linha', {
@@ -281,38 +509,19 @@
     }
 
     function filtrarTabela() {
-    const input = document.getElementById('search-input').value.toLowerCase();
-    const tbody = document.getElementById('tabela-body');
-    const trs = tbody.getElementsByTagName('tr');
-
+        const input = document.getElementById('search-input').value.toLowerCase();
+        const trs = document.getElementById('tabela-body').getElementsByTagName('tr');
         for (let i = 0; i < trs.length; i++) {
-            const rowText = trs[i].textContent.toLowerCase();
-                if (rowText.includes(input)) {
-                trs[i].style.display = "";
-            } else {
-                trs[i].style.display = "none";
-            }
+            trs[i].style.display = trs[i].textContent.toLowerCase().includes(input) ? "" : "none";
         }
     }
 
-    // Função para abrir e formatar o conteúdo (JSON ou texto longo)
     function mostrarConteudo(conteudoString) {
         let formatado;
-        try {
-            const obj = JSON.parse(conteudoString);
-            formatado = JSON.stringify(obj, null, 4);
-        } catch(e) {
-            formatado = conteudoString;
-        }
-
+        try { const obj = JSON.parse(conteudoString); formatado = JSON.stringify(obj, null, 4); } 
+        catch(e) { formatado = conteudoString; }
         const win = window.open("", "_blank", "width=700,height=800");
-        win.document.write(`
-            <body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;">
-                <h2 style="margin-top: 0; color: #4fc3f7;">Conteúdo Completo</h2>
-                <pre style="font-size: 13px; max-height: 600px; overflow: auto; background: #252526; padding: 15px; border-radius: 6px; border: 1px solid #3e3e42; white-space: pre-wrap; word-wrap: break-word;">${formatado.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-                <button onclick="window.close()" style="padding: 8px 16px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">Fechar</button>
-            </body>
-        `);
+        win.document.write(`<body style="background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px;"><pre>${formatado.replace(/</g, "&lt;")}</pre></body>`);
     }
 </script>
 {% endblock %}

@@ -6,7 +6,7 @@ import docx
 import json
 import shutil
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 #vários imports ainda não utilizados mas que serão uteis para futuras funcionalidades (ex: gestão de utilizadores, autenticação, etc.)
 from flask import Flask, render_template, g, request, send_file, jsonify, abort
@@ -489,7 +489,7 @@ def docente_detalhes():
         cursor = db.cursor(dictionary=True)
         
         # 1. Buscar info base do docente e o Histórico Permanente!
-        cursor.execute("SELECT tipo_docente, departamento, id_contrato, dados_historico FROM docentes WHERE nome = %s", (nome,))
+        cursor.execute("SELECT id_docente, tipo_docente, departamento, dados_historico FROM docentes WHERE nome = %s", (nome,))
         docente = cursor.fetchone()
         
         if docente:
@@ -503,18 +503,17 @@ def docente_detalhes():
                     if valor:
                         detalhes[chave] = valor
             
-            # Buscar dados da Carga horária
-            if docente["id_contrato"]:
-                cursor.execute(
-                    "SELECT ch.tempo_contratual, ch.tempo_aulas, ch.tempo_apoio, ch.tempo_preparacao, ch.percentagem "
-                    "FROM contratos c JOIN carga_horaria ch ON c.carga_horaria_id_carga = ch.id_carga "
-                    "WHERE c.id_contrato = %s",
-                    (docente["id_contrato"],)
-                )
-                contrato = cursor.fetchone()
-                if contrato:
-                    detalhes["total_horas_contacto"] = contrato["tempo_aulas"]
-                    detalhes["horario_semanal"] = f"Carga {contrato['percentagem']}%: {contrato['tempo_contratual']}h total / {contrato['tempo_aulas']}h aulas / {contrato['tempo_apoio']}h apoio / {contrato['tempo_preparacao']}h preparação"
+            # Buscar dados da Carga horária - obter contrato(s) associado(s) ao docente
+            cursor.execute(
+                "SELECT c.id_contrato, ch.tempo_contratual, ch.tempo_aulas, ch.tempo_apoio, ch.tempo_preparacao, ch.percentagem "
+                "FROM contratos c JOIN carga_horaria ch ON c.carga_horaria_id_carga = ch.id_carga "
+                "WHERE c.docentes_id_docente = %s ORDER BY c.id_contrato DESC LIMIT 1",
+                (docente["id_docente"],)
+            )
+            contrato = cursor.fetchone()
+            if contrato:
+                detalhes["total_horas_contacto"] = contrato["tempo_aulas"]
+                detalhes["horario_semanal"] = f"Carga {contrato['percentagem']}%: {contrato['tempo_contratual']}h total / {contrato['tempo_aulas']}h aulas / {contrato['tempo_apoio']}h apoio / {contrato['tempo_preparacao']}h preparação"
 
         # 2. Buscar Rascunho (Se o utilizador tiver um rascunho a meio, ele ganha prioridade sobre o histórico)
         cursor.execute(
@@ -648,8 +647,15 @@ def submeter_contratacao():
         # ==========================================
         # PASSO 3: DESCOBRIR O TEMPLATE ID
         # ==========================================
-        # Procuramos o template que corresponde ao tipo de contrato enviado pelo formulário
-        cursor.execute("SELECT id_template FROM templates WHERE tipo_contrato = %s", (tipo,))
+        # Mapeamento do tipo do formulário para o valor exato na tabela templates
+        TEMPLATE_POR_TIPO = {
+            "renovacao-integral": "Tempo Integral",
+            "renovacao-parcial":  "Tempo Parcial",
+            "primeira-vez":       "Tempo Parcial Edital",
+        }
+        tipo_template_bd = TEMPLATE_POR_TIPO.get(tipo)
+
+        cursor.execute("SELECT id_template FROM templates WHERE tipo_contrato = %s", (tipo_template_bd,))
         resultado_template = cursor.fetchone()
         
         if resultado_template:
@@ -658,10 +664,9 @@ def submeter_contratacao():
             # Fallback: Se não houver correspondência exata, apanha o primeiro template disponível
             cursor.execute("SELECT id_template FROM templates LIMIT 1")
             fallback_template = cursor.fetchone()
-            if fallback_template:
-                id_template = fallback_template['id_template']
-            else:
-                return jsonify({"erro": "A tabela templates está vazia na BD. Insira um template de referência."}), 400
+            id_template = fallback_template['id_template'] if fallback_template else None
+            if not id_template:
+                return jsonify({"erro": "Tabela templates vazia."}), 400
 
         # ==========================================
         # PASSO 4: CRIAR O CONTRATO (COM AS TRÊS CHAVES OBRIGATÓRIAS)
@@ -1039,6 +1044,183 @@ def apagar_pasta(caso):
 @app.route('/base-dados')
 def explorar_bd():
     return render_template('base_dados.html')
+
+@app.route('/api/filtros-disponiveis')
+def filtros_disponiveis():
+    """Retorna os valores únicos para os filtros da consulta."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        
+        filtros = {
+            "departamentos": [],
+            "tipos_contrato": list(TIPOS_DOCUMENTOS_PERMITIDOS),
+            "anos_letivos": []
+        }
+        
+        cursor.execute("SELECT DISTINCT departamento FROM docentes WHERE departamento IS NOT NULL AND departamento != ''")
+        filtros["departamentos"] = [r[0] for r in cursor.fetchall()]
+        
+        # Tentar obter anos letivos dos rascunhos
+        cursor.execute("SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(dados_formulario, '$.ano_letivo')) FROM rascunhos WHERE JSON_EXTRACT(dados_formulario, '$.ano_letivo') IS NOT NULL")
+        anos = [r[0] for r in cursor.fetchall() if r[0]]
+        
+        # Adicionar anos letivos de contratos se existirem (através da data_renovacao como fallback)
+        cursor.execute("SELECT DISTINCT YEAR(data_renovacao) FROM contratos WHERE data_renovacao IS NOT NULL")
+        anos_cont = [f"{r[0]}-{r[0]+1}" for r in cursor.fetchall() if r[0]]
+        
+        filtros["anos_letivos"] = sorted(list(set(anos + anos_cont)), reverse=True)
+        
+        cursor.close()
+        return jsonify(filtros)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/consulta-docentes')
+def consulta_docentes():
+    """Consulta avançada de docentes com filtros."""
+    nome = request.args.get('nome', '').strip()
+    dept = request.args.get('departamento', '').strip()
+    tipo = request.args.get('tipo_contrato', '').strip()
+    ano = request.args.get('ano_letivo', '').strip()
+    
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        
+        # Base da query - usando a estrutura exata fornecida
+        # Nota: isJuri na BD é "sim" ou "não"
+        query = "SELECT DISTINCT d.id_docente, d.nome, d.departamento, d.tipo_docente, d.isJuri FROM docentes d"
+        joins = []
+        where_clauses = ["1=1"]
+        params = []
+        
+        if nome:
+            where_clauses.append("d.nome LIKE %s")
+            params.append(f"%{nome}%")
+        
+        if dept:
+            where_clauses.append("d.departamento = %s")
+            params.append(dept)
+            
+        if tipo:
+            joins.append("LEFT JOIN contratos c ON d.id_docente = c.docentes_id_docente")
+            joins.append("LEFT JOIN templates t ON c.templates_id_template = t.id_template")
+            where_clauses.append("(t.tipo_contrato = %s OR d.dados_historico LIKE %s)")
+            params.append(tipo)
+            params.append(f"%{tipo}%")
+
+        if ano:
+            where_clauses.append("(d.dados_historico LIKE %s OR EXISTS (SELECT 1 FROM rascunhos r WHERE r.nome_docente = d.nome AND r.dados_formulario LIKE %s))")
+            params.append(f"%{ano}%")
+            params.append(f"%{ano}%")
+        
+        final_query = f"{query} {' '.join(joins)} WHERE {' AND '.join(where_clauses)}"
+        
+        cursor.execute(final_query, tuple(params))
+        docentes = cursor.fetchall()
+        
+        cursor.close()
+        return jsonify({"docentes": docentes})
+    except Exception as e:
+        print(f"[!] Erro na consulta: {e}")
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/detalhe-docente/<int:id_docente>')
+def detalhe_docente(id_docente):
+    """Retorna todos os dados associados a um docente usando a estrutura completa."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        
+        # 1. Dados Pessoais (docentes: id_docente, nome, tipo_docente, departamento, dados_historico, isJuri)
+        cursor.execute("SELECT * FROM docentes WHERE id_docente = %s", (id_docente,))
+        docente = cursor.fetchone()
+        if not docente:
+            return jsonify({"erro": "Docente não encontrado"}), 404
+        
+        if docente.get('dados_historico'):
+            try:
+                docente['historico_json'] = json.loads(docente['dados_historico'])
+            except:
+                docente['historico_json'] = {}
+        
+        # 2. Contratos e Carga Horária
+        cursor.execute("""
+            SELECT 
+                c.id_contrato, c.numero_renovacao, c.data_renovacao,
+                ch.tempo_contratual, ch.tempo_aulas, ch.tempo_apoio, ch.tempo_preparacao, ch.percentagem,
+                t.tipo_contrato as tipo_template, t.caminho_ficheiro as template_path
+            FROM contratos c
+            LEFT JOIN carga_horaria ch ON c.carga_horaria_id_carga = ch.id_carga
+            LEFT JOIN templates t ON c.templates_id_template = t.id_template
+            WHERE c.docentes_id_docente = %s
+            ORDER BY c.data_renovacao DESC
+        """, (id_docente,))
+        contratos = cursor.fetchall()
+
+        # Mapeamento de tipo da tabela templates → label legível para o frontend
+        TIPO_LEGIVEL = {
+            "Tempo Integral":      "Tempo Integral",
+            "Tempo Parcial":       "Tempo Parcial",
+            "Tempo Parcial Edital":"Tempo Parcial (Edital)",
+        }
+
+        for c in contratos:
+            for k, v in c.items():
+                if hasattr(v, '__float__'):
+                    c[k] = float(v)
+                elif isinstance(v, (datetime, date)):
+                    c[k] = v.isoformat()
+
+            # Tipo legível (dentro do loop — um por contrato)
+            c['tipo_legivel'] = TIPO_LEGIVEL.get(c.get('tipo_template'), c.get('tipo_template') or 'Contrato')
+
+            # Ano letivo: buscar no caminho do documento associado a este contrato
+            cursor.execute(
+                "SELECT caminho FROM documentos WHERE contratos_id_contrato = %s LIMIT 1",
+                (c['id_contrato'],)
+            )
+            doc = cursor.fetchone()
+            if doc:
+                # O caminho tem a estrutura: .../Contrato_Nome/2025-2026/ficheiro.docx
+                partes = doc['caminho'].replace('\\', '/').split('/')
+                ano = next((p for p in partes if '-' in p and len(p) == 9 and p[:4].isdigit()), None)
+                c['ano_letivo'] = ano
+            else:
+                c['ano_letivo'] = None
+
+        # 3. Documentos (documentos: id, nome, caminho, categoria, data_upload, versao_contrato, contratos_id_contrato, docentes_id_docente)
+        cursor.execute("""
+            SELECT id, nome, caminho, categoria, data_upload, versao_contrato, contratos_id_contrato 
+            FROM documentos 
+            WHERE docentes_id_docente = %s
+        """, (id_docente,))
+        documentos = cursor.fetchall()
+        for d in documentos:
+            if isinstance(d.get('data_upload'), (datetime, date)):
+                d['data_upload'] = d['data_upload'].isoformat()
+
+        # 4. Rascunhos
+        cursor.execute("SELECT id, tipo_contrato, data_guardado, dados_formulario FROM rascunhos WHERE nome_docente = %s", (docente['nome'],))
+        rascunhos = cursor.fetchall()
+        for r in rascunhos:
+            if r.get('dados_formulario'):
+                try:
+                    r['dados_formulario'] = json.loads(r['dados_formulario'])
+                except:
+                    pass
+
+        cursor.close()
+        return jsonify({
+            "docente": docente,
+            "contratos": contratos,
+            "documentos": documentos,
+            "rascunhos": rascunhos
+        })
+    except Exception as e:
+        print(f"[!] Erro no detalhe: {e}")
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/procurar-docente')
 def procurar_docente():
