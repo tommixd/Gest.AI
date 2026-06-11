@@ -16,6 +16,7 @@ from langchain_community.llms import LlamaCpp
 from file_loader import carregar_documentos
 from rag_component import construir_retriever, recuperar_com_foco, PASTA_TO_CHUNKS
 from sql_component import criar_sql_agent, consultar_bd
+from query_templates import tentar_template
 
 warnings.filterwarnings("ignore")
 
@@ -148,14 +149,9 @@ def responder_pergunta(
     anos = re.findall(r'\b(20\d{2}(?:/\d{2,4})?)\b', pergunta)
 
     # --- Componente 3: SQL Agent ---
-    info_sql = ""
-    try:
-        resultado_sql = consultar_bd(pergunta, sql_agente)
-        # O agente devolve texto; só usamos se contiver dados úteis
-        if resultado_sql and "não" not in resultado_sql.lower()[:30]:
-            info_sql = f"\n--- DADOS DA BASE DE DADOS ---\n{resultado_sql}\n--- FIM ---\n"
-    except Exception as e:
-        print(f"[Orquestrador] SQL Agent ignorado: {e}")
+    info_sql = tentar_template(pergunta)          # rápido, sem LLM
+    if not info_sql:
+        info_sql = consultar_bd(pergunta, sql_agente)  # fallback com LLM
 
     # --- Componente 2: RAG ---
     docs = recuperar_com_foco(pergunta, retriever, nome_pasta=pasta_forçada)

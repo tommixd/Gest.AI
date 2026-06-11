@@ -4,7 +4,6 @@ import json
 import mysql.connector
 from db_config import DB_CONFIG
 
-# NOVO IMPORT: Sai o "import docx", entra o DocxTemplate
 from docxtpl import DocxTemplate 
 
 CATEGORIA_POR_TIPO = {
@@ -22,7 +21,55 @@ def criar_nome_pasta_limpo(nome_completo):
     nome_limpo = re.sub(r'[\\/*?:"<>|]', "", nome)
     return f"Contrato_{nome_limpo}"
 
+def validar_juris(dados_contrato):
+    """Garante que os júris são elegíveis e que o docente não é júri de si próprio."""
+    nome_docente = dados_contrato.get("nome_docente", "").strip()
+    campos_juri = ["profAAA", "profBBB", "profCCC", "profDDD"]
+    erros = []
+
+    try:
+        ligacao = mysql.connector.connect(**DB_CONFIG)
+        cursor = ligacao.cursor(dictionary=True)
+
+        for campo in campos_juri:
+            nome_juri = dados_contrato.get(campo, "").strip()
+            if not nome_juri:
+                continue
+
+            # Regra 1: o docente não pode ser júri de si próprio
+            if nome_juri.lower() == nome_docente.lower():
+                erros.append(f"O docente '{nome_docente}' não pode ser júri de si próprio ({campo}).")
+                continue
+
+            # Regra 2: verificar isJuri = 'Sim' na base de dados
+            cursor.execute(
+                "SELECT isJuri FROM docentes WHERE nome = %s",
+                (nome_juri,)
+            )
+            resultado = cursor.fetchone()
+
+            if not resultado:
+                erros.append(f"Júri '{nome_juri}' ({campo}) não encontrado na base de dados.")
+            elif resultado["isJuri"].lower() != "sim":
+                erros.append(f"'{nome_juri}' ({campo}) não tem permissão para ser júri (isJuri = Não).")
+
+        cursor.close()
+        ligacao.close()
+
+    except Exception as e:
+        erros.append(f"Erro ao validar júris na base de dados: {e}")
+
+    return erros
+
 def processar_renovacao(dados_contrato):
+    erros_juris = validar_juris(dados_contrato)
+    if erros_juris:
+        for erro in erros_juris:
+            print(f"[!] Validação Júri: {erro}")
+        print("[!] Processo cancelado: júris inválidos.")
+        return {"sucesso": False, "erros": erros_juris}
+    
+
     tipo_contrato = dados_contrato.get("tipo_contrato", "integral").lower()
     categoria_bd = CATEGORIA_POR_TIPO.get(tipo_contrato)
     

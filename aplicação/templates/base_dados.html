@@ -337,7 +337,10 @@
                 data.documentos.map(doc => `
                     <li style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                         <span>📄 ${doc.nome} <small style="color: var(--text-muted);">(${doc.categoria})</small></span>
-                        <a href="/ver_documento/${doc.id}" target="_blank" class="btn-ui" style="padding: 4px 10px; font-size: 0.75rem; text-decoration: none;">Abrir</a>
+                        <div style="display: flex; gap: 8px;">
+                            <a href="/ver_documento/${doc.id}" target="_blank" class="btn-ui" style="padding: 4px 10px; font-size: 0.75rem; text-decoration: none;">👁 Abrir</a>
+                            <a href="/download-documento/${doc.id}" class="btn-ui" style="padding: 4px 10px; font-size: 0.75rem; text-decoration: none; background: #34c759;">⬇ Download</a>
+                        </div>
                     </li>
                 `).join('') + `</ul>`;
         } else {

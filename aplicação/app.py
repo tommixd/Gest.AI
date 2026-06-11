@@ -469,6 +469,30 @@ def iniciar_contratacao(tipo):
                            cursos=lista_cursos,
                            cargas=lista_cargas)
 
+@app.route('/api/juris-disponiveis')
+def juris_disponiveis():
+    """Devolve docentes com isJuri = 'sim', excluindo o proprio docente"""
+    nome_docente = request.args.get('excluir', '').strip()
+
+    try:
+        ligacao = mysql.connector.connect(**DB_CONFIG)
+        cursor = ligacao.cursor(dictionary=True)
+
+        query = """
+          SELECT nome 
+          FROM docentes
+          WHERE isJuri = 'sim' AND nome != %s
+          ORDER BY nome ASC
+        """
+
+        cursor.execute(query, (nome_docente,))
+        juris = [row['nome'] for row in cursor.fetchall()]
+        cursor.close()
+        ligacao.close()
+        return jsonify({"juris": juris})
+    
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/docente-detalhes')
 def docente_detalhes():
@@ -630,19 +654,39 @@ def submeter_contratacao():
         id_da_carga = dados.get('id_carga')
         
         if not id_da_carga:
-            percentagem = dados.get('percentagem', 100)
-            cursor.execute("SELECT id_carga FROM carga_horaria WHERE percentagem = %s", (percentagem,))
-            resultado_carga = cursor.fetchone()
+            # Fallback 1: tentar por percentagem se vier no formulário
+            percentagem = dados.get('percentagem')
+            if percentagem:
+                cursor.execute("SELECT id_carga FROM carga_horaria WHERE percentagem = %s LIMIT 1", (percentagem,))
+                resultado_carga = cursor.fetchone()
+                if resultado_carga:
+                    id_da_carga = resultado_carga['id_carga']
             
-            if resultado_carga:
-                id_da_carga = resultado_carga['id_carga']
-            else:
-                cursor.execute("SELECT id_carga FROM carga_horaria LIMIT 1")
-                fallback_carga = cursor.fetchone()
-                if fallback_carga:
-                    id_da_carga = fallback_carga['id_carga']
-                else:
-                    return jsonify({"erro": "A tabela carga_horaria está vazia na BD. Insira valores de referência."}), 400
+            # Fallback 2: tentar por total_horas_contacto (tempo_aulas)
+            if not id_da_carga:
+                total_horas = dados.get('total_horas_contacto')
+                if total_horas:
+                    cursor.execute("SELECT id_carga FROM carga_horaria WHERE tempo_aulas = %s LIMIT 1", (total_horas,))
+                    resultado_carga = cursor.fetchone()
+                    if resultado_carga:
+                        id_da_carga = resultado_carga['id_carga']
+            
+            # Fallback 3 (último recurso): 100% para tempo integral, primeiro registo para parcial
+            if not id_da_carga:
+                if tipo == 'renovacao-integral':
+                    cursor.execute("SELECT id_carga FROM carga_horaria WHERE percentagem = 100 LIMIT 1")
+                    resultado_carga = cursor.fetchone()
+                    if resultado_carga:
+                        id_da_carga = resultado_carga['id_carga']
+                
+                if not id_da_carga:
+                    cursor.execute("SELECT id_carga FROM carga_horaria ORDER BY id_carga ASC LIMIT 1")
+                    fallback_carga = cursor.fetchone()
+                    if fallback_carga:
+                        id_da_carga = fallback_carga['id_carga']
+                        print(f"[!] Aviso: id_carga não recebido do formulário. A usar carga de fallback: {id_da_carga}")
+                    else:
+                        return jsonify({"erro": "A tabela carga_horaria está vazia na BD. Insira valores de referência."}), 400
 
         # ==========================================
         # PASSO 3: DESCOBRIR O TEMPLATE ID
@@ -824,7 +868,7 @@ def chat():
 def ver_documento(doc_id):
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT caminho FROM documentos WHERE id = %s", (doc_id,))
+    cursor.execute("SELECT nome, caminho FROM documentos WHERE id = %s", (doc_id,))
     doc = cursor.fetchone()
     cursor.close()
     
@@ -833,6 +877,22 @@ def ver_documento(doc_id):
         caminho_abs = os.path.join(ROOT_DIR, doc['caminho'])
         if os.path.exists(caminho_abs): 
             return send_file(caminho_abs)
+    return "Não encontrado", 404
+
+@app.route('/download-documento/<int:doc_id>')
+def download_documento(doc_id):
+    """Força o download do documento (sem abrir no browser)."""
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT nome, caminho FROM documentos WHERE id = %s", (doc_id,))
+    doc = cursor.fetchone()
+    cursor.close()
+    
+    if doc:
+        ROOT_DIR = os.path.dirname(BASE_DIR)
+        caminho_abs = os.path.join(ROOT_DIR, doc['caminho'])
+        if os.path.exists(caminho_abs):
+            return send_file(caminho_abs, as_attachment=True, download_name=doc['nome'])
     return "Não encontrado", 404
 
 # --- ROTAS DE ELIMINAÇÃO ---

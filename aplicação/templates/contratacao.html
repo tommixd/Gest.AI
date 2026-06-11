@@ -134,30 +134,45 @@
     </div>
 
     <div class="section-title">Membros do Júri</div>
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Professor A</label>
-        <input type="text" name="profAAA" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profAAA', '') if form_data else '' }}">
-      </div>
-      <div class="form-group">
-        <label>Professor B</label>
-        <input type="text" name="profBBB" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profBBB', '') if form_data else '' }}">
-      </div>
-      <div class="form-group">
-        <label>Professor C</label>
-        <input type="text" name="profCCC" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profCCC', '') if form_data else '' }}">
-      </div>
-      <div class="form-group">
-        <label>Professor D</label>
-        <input type="text" name="profDDD" list="lista-professores" autocomplete="off" required value="{{ form_data.get('profDDD', '') if form_data else '' }}">
-      </div>
-      
-      <div class="form-group full-width">
-        <label>Presidente do Júri / Diretor</label>
-        <input type="text" name="profXXX" list="lista-diretor" autocomplete="off" required 
-               value="{{ form_data.get('profXXX', 'Prof. Dr. Germano Silva') }}">
-      </div>
-    </div>
+
+<!-- Aviso de alerta, oculto por omissão -->
+<div id="aviso-juris" style="display:none; background: #fff3cd; border: 1px solid #ffc107; 
+     color: #856404; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.9rem;">
+  Selecione primeiro o nome do docente para carregar os júris disponíveis.
+</div>
+
+<div class="form-grid">
+  <div class="form-group">
+    <label>Professor A</label>
+    <select name="profAAA" id="juri_A" required>
+      <option value="">-- Selecionar júri --</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Professor B</label>
+    <select name="profBBB" id="juri_B" required>
+      <option value="">-- Selecionar júri --</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Professor C</label>
+    <select name="profCCC" id="juri_C" required>
+      <option value="">-- Selecionar júri --</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Professor D</label>
+    <select name="profDDD" id="juri_D" required>
+      <option value="">-- Selecionar júri --</option>
+    </select>
+  </div>
+
+  <div class="form-group full-width">
+    <label>Presidente do Júri / Diretor</label>
+    <input type="text" name="profXXX" list="lista-diretor" autocomplete="off" required 
+           value="{{ form_data.get('profXXX', 'Prof. Dr. Germano Silva') }}">
+  </div>
+</div>
 
     <div id="section-ucs">
         <div class="section-title">Distribuição de Serviço (UCs)</div>
@@ -227,8 +242,10 @@
                     <strong>35 horas (Tempo Integral)</strong>
                 </div>
                 <input type="hidden" name="total_horas_contacto" value="35" id="total_horas_contacto_hidden">
+                <!-- id_carga é enviado ao submeter para o backend identificar a carga correta -->
+                <input type="hidden" name="id_carga" id="id_carga_hidden" value="">
                 
-                <select name="total_horas_contacto" id="total_horas_contacto" style="display:none;">
+                <select id="total_horas_contacto" style="display:none;" onchange="sincronizarIdCarga(this)">
                     <option value="">Escolher carga horária...</option>
                 </select>
             </div>
@@ -252,6 +269,7 @@
 {% block scripts %}
 <script>
   let cargasDisponíveis = [];
+  const CAMPOS_JURI = ['juri_A', 'juri_B', 'juri_C', 'juri_D'];
 
 document.addEventListener('DOMContentLoaded', async function() {
     const tipo = "{{ tipo }}";
@@ -355,15 +373,90 @@ document.addEventListener('DOMContentLoaded', async function() {
         while (select.options.length > 1) {
           select.remove(1);
         }
+        // value = id_carga para que o backend receba o id correto ao submeter
         cargasDisponíveis.forEach(carga => {
           const option = document.createElement('option');
-          option.value = carga.tempo_aulas;
+          option.value = carga.id;
+          option.dataset.tempoAulas = carga.tempo_aulas;
+          option.dataset.percentagem = carga.percentagem;
           option.textContent = carga.display;
           select.appendChild(option);
         });
       }
     } catch (err) {
       console.warn('Erro ao carregar cargas horárias:', err);
+    }
+  }
+
+  // Quando o utilizador escolhe uma carga, propaga o id_carga e o total_horas para campos hidden
+  function sincronizarIdCarga(select) {
+    const selected = select.options[select.selectedIndex];
+    const idCargaHidden = document.getElementById('id_carga_hidden');
+    const totalHorasHidden = document.getElementById('total_horas_contacto_hidden');
+    if (selected && selected.value) {
+      if (idCargaHidden) idCargaHidden.value = selected.value;
+      if (totalHorasHidden) totalHorasHidden.value = selected.dataset.tempoAulas || '';
+    } else {
+      if (idCargaHidden) idCargaHidden.value = '';
+      if (totalHorasHidden) totalHorasHidden.value = '';
+    }
+  }
+
+  async function carregarJuris(nomeDocente) {
+    const aviso = document.getElementById('aviso-juris');
+
+    if (!nomeDocente) {
+      CAMPOS_JURI.forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) {
+          sel.innerHTML = '<option value="">-- Selecionar júri --</option>';
+          sel.disabled = true;
+        }
+      });
+      if (aviso) aviso.style.display = 'block';
+      return;
+    }
+
+    if (aviso) aviso.style.display = 'none';
+
+    try {
+      const response = await fetch(`/api/juris-disponiveis?excluir=${encodeURIComponent(nomeDocente)}`);
+      const data = await response.json();
+
+      if (data.erro) {
+        console.warn('Erro ao carregar júris:', data.erro);
+        return;
+      }
+
+      CAMPOS_JURI.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const valorAtual = sel.value;
+
+        sel.innerHTML = '<option value="">-- Selecionar júri --</option>';
+        sel.disabled = false;
+
+        data.juris.forEach(nome => {
+          const opt = document.createElement('option');
+          opt.value = nome;
+          opt.textContent = nome;
+          if (nome === valorAtual) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        {% if form_data %}
+        const valoresPorId = {
+          'juri_A': '{{ form_data.get("profAAA", "") }}',
+          'juri_B': '{{ form_data.get("profBBB", "") }}',
+          'juri_C': '{{ form_data.get("profCCC", "") }}',
+          'juri_D': '{{ form_data.get("profDDD", "") }}'
+        };
+        if (valoresPorId[id]) sel.value = valoresPorId[id];
+        {% endif %}
+      });
+
+    } catch (err) {
+      console.warn('Erro de ligação ao carregar júris:', err);
     }
   }
 
@@ -410,6 +503,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (option) selectHoras.value = option.value;
         }
       }
+
+      // --- JÚRIS: carregar da API excluindo o próprio docente ---
+      await carregarJuris(nome);
       
       // Preencher o dropdown de horario_semanal se existir
       if (result.horario_semanal) {
@@ -417,6 +513,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (selectHorario) {
           const option = Array.from(selectHorario.options).find(opt => opt.value.includes(result.horario_semanal));
           if (option) selectHorario.value = option.value;
+        }
+      }
+
+      // Sincronizar id_carga se o histórico tiver percentagem (para pré-selecionar a carga correta)
+      const selectHoras = document.getElementById('total_horas_contacto');
+      if (selectHoras && selectHoras.style.display !== 'none') {
+        // Tentar encontrar por total_horas_contacto (tempo_aulas) vindo do histórico
+        if (result.total_horas_contacto) {
+          const opt = Array.from(selectHoras.options).find(o => o.dataset.tempoAulas == result.total_horas_contacto);
+          if (opt) {
+            selectHoras.value = opt.value;
+            sincronizarIdCarga(selectHoras);
+          }
         }
       }
     } catch (err) {
