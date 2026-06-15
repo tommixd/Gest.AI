@@ -33,6 +33,41 @@
   .doc-item-link { color: var(--text); text-decoration: none; font-weight: 500; transition: color 0.2s; word-break: break-word; }
   .doc-item-link:hover { color: var(--primary); }
   .doc-item-date { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+
+  /* Botões de ação por documento */
+  .doc-actions { display: flex; gap: 6px; align-items: center; opacity: 0; transition: opacity 0.15s; }
+  .doc-item-container:hover .doc-actions { opacity: 1; }
+  .btn-doc-action { background: none; border: 1px solid var(--border); border-radius: 5px; padding: 3px 8px; font-size: 0.72rem; cursor: pointer; color: var(--text-muted); font-family: 'Outfit', sans-serif; transition: 0.15s; white-space: nowrap; }
+  .btn-doc-action:hover { background: var(--hover-bg); color: var(--text); border-color: var(--primary); }
+  .btn-doc-action.danger:hover { border-color: #e53e3e; color: #e53e3e; }
+
+  /* Rename inline */
+  .rename-input { font-size: 0.9rem; font-family: 'Outfit', sans-serif; border: 1px solid var(--primary); border-radius: 5px; padding: 3px 8px; background: var(--bg); color: var(--text); flex: 1; }
+  .rename-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+
+  /* Botão de adicionar ficheiro à pasta */
+  .btn-adicionar-ficheiro { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px dashed var(--border); border-radius: 6px; padding: 6px 12px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; font-family: 'Outfit', sans-serif; transition: 0.15s; margin-top: 6px; }
+  .btn-adicionar-ficheiro:hover { border-color: var(--primary); color: var(--primary); background: rgba(26,115,232,0.04); }
+
+  /* Modal de upload */
+  .upload-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; display: none; align-items: center; justify-content: center; }
+  .upload-modal-backdrop.open { display: flex; }
+  .upload-modal { background: var(--panel-bg); border-radius: 14px; padding: 32px; width: 460px; max-width: 95vw; box-shadow: 0 8px 40px rgba(0,0,0,0.2); border: 1px solid var(--border); animation: fadeIn 0.2s ease; }
+  .upload-modal h3 { margin: 0 0 6px 0; font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--title-color); }
+  .upload-modal p.subtitle { margin: 0 0 22px 0; color: var(--text-muted); font-size: 0.88rem; }
+  .upload-field-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; display: block; }
+  .upload-modal select, .upload-modal input[type=file] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.95rem; margin-bottom: 16px; box-sizing: border-box; }
+  .upload-modal select:focus { outline: none; border-color: var(--primary); }
+  .upload-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .btn-modal-cancel { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 9px 20px; border-radius: 8px; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 0.9rem; transition: 0.15s; }
+  .btn-modal-cancel:hover { background: var(--hover-bg); }
+  .btn-modal-submit { background: var(--primary); color: white; border: none; padding: 9px 22px; border-radius: 8px; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600; transition: 0.15s; }
+  .btn-modal-submit:hover { background: var(--primary-hover); }
+  .upload-status { font-size: 0.85rem; margin-top: 10px; min-height: 20px; text-align: center; }
+
+  /* Botão principal de upload no topo */
+  .btn-upload-principal { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: 0.2s; margin-bottom: 4px; }
+  .btn-upload-principal:hover { background: var(--primary-hover); }
 {% endblock %}
 
 {% block content %}
@@ -50,7 +85,12 @@
 
   <div id="upload" class="panel">
     <div class="database-section">
-      <h2 class="database-title">Base de Dados (Arquivo)</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
+        <h2 class="database-title" style="margin: 0;">Base de Dados (Arquivo)</h2>
+        <button class="btn-upload-principal" onclick="abrirModalUpload()">
+          ＋ Adicionar Ficheiro
+        </button>
+      </div>
       
       {% for categoria, contratos in documentos_agrupados.items() %}
         <div class="doc-category">
@@ -68,11 +108,15 @@
                   
                   {% if nome_pasta == 'Ficheiros' %}
                     {% for doc in docs %}
-                      <div class="doc-item-container">
+                      <div class="doc-item-container" id="doc-row-{{ doc.id }}">
                         <div class="doc-item-info">
                           <span>📄</span>
-                          <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
+                          <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link" id="doc-link-{{ doc.id }}">{{ doc.nome }}</a>
                           <span class="doc-item-date">({{ (doc.data_upload | string)[:10] }})</span>
+                        </div>
+                        <div class="doc-actions">
+                          <button class="btn-doc-action" onclick="iniciarRenomear({{ doc.id }}, '{{ doc.nome | replace("'", "\\'") }}')">Editar nome</button>
+                          <a href="/download-documento/{{ doc.id }}" class="btn-doc-action" style="text-decoration:none;">Download</a>
                         </div>
                       </div>
                     {% endfor %}
@@ -84,11 +128,15 @@
                       </div>
                       <div class="sub-content folder-content">
                         {% for doc in docs %}
-                          <div class="doc-item-container">
+                          <div class="doc-item-container" id="doc-row-{{ doc.id }}">
                             <div class="doc-item-info">
                               <span>📄</span>
-                              <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link">{{ doc.nome }}</a>
+                              <a href="/ver_documento/{{ doc.id }}" target="_blank" class="doc-item-link" id="doc-link-{{ doc.id }}">{{ doc.nome }}</a>
                               <span class="doc-item-date">({{ (doc.data_upload | string)[:10] }})</span>
+                            </div>
+                            <div class="doc-actions">
+                              <button class="btn-doc-action" onclick="iniciarRenomear({{ doc.id }}, '{{ doc.nome | replace("'", "\\'") }}')">Editar nome</button>
+                              <a href="/download-documento/{{ doc.id }}" class="btn-doc-action" style="text-decoration:none;">Download</a>
                             </div>
                           </div>
                         {% endfor %}
@@ -102,6 +150,28 @@
           {% endfor %}
         </div>
       {% endfor %}
+    </div>
+  </div>
+
+  <!-- Modal de Upload -->
+  <div class="upload-modal-backdrop" id="upload-modal-backdrop" onclick="fecharModalUpload(event)">
+    <div class="upload-modal" onclick="event.stopPropagation()">
+      <h3>Adicionar Ficheiro</h3>
+      <p class="subtitle">Escolhe a pasta de destino e seleciona o ficheiro a adicionar.</p>
+
+      <label class="upload-field-label">Pasta de destino</label>
+      <select id="upload-pasta-select">
+        <option value="">A carregar pastas...</option>
+      </select>
+
+      <label class="upload-field-label">Ficheiro</label>
+      <input type="file" id="upload-file-input" accept=".docx,.pdf,.doc,.xlsx,.txt">
+
+      <div class="upload-modal-actions">
+        <button class="btn-modal-cancel" onclick="fecharModalUpload()">Cancelar</button>
+        <button class="btn-modal-submit" onclick="submeterUploadTemplate()">Adicionar</button>
+      </div>
+      <div class="upload-status" id="upload-status-msg"></div>
     </div>
   </div>
 {% endblock %}
@@ -158,14 +228,168 @@
 
   function handleKeyPress(e) { if (e.key === 'Enter') enviarMensagem(); }
 
-  // Deteta se viemos de outra página com intenção de abrir os Documentos
   document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('tab') === 'documentos') {
-      // Como o switchPanel está no base.html, podemos chamá-lo diretamente aqui
       const btnDocs = document.querySelector('.btn-nav-link[data-panel="upload"]');
       if (btnDocs) switchPanel('upload', btnDocs);
     }
   });
+
+  // ─── RENOMEAR DOCUMENTO ───────────────────────────────────────────
+  function iniciarRenomear(docId, nomeAtual) {
+    const row = document.getElementById(`doc-row-${docId}`);
+    const infoDiv = row.querySelector('.doc-item-info');
+    const actionsDiv = row.querySelector('.doc-actions');
+
+    // Substituir o link por um input de texto
+    infoDiv.innerHTML = `
+      <span>📄</span>
+      <input class="rename-input" id="rename-input-${docId}" type="text" value="${nomeAtual}">
+    `;
+    actionsDiv.innerHTML = `
+      <button class="btn-doc-action" onclick="confirmarRenomear(${docId})">✔ Guardar</button>
+      <button class="btn-doc-action danger" onclick="cancelarRenomear(${docId}, '${nomeAtual.replace(/'/g,"\\'")}')">✖ Cancelar</button>
+    `;
+    actionsDiv.style.opacity = '1';
+
+    const input = document.getElementById(`rename-input-${docId}`);
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmarRenomear(docId);
+      if (e.key === 'Escape') cancelarRenomear(docId, nomeAtual);
+    });
+  }
+
+  async function confirmarRenomear(docId) {
+    const input = document.getElementById(`rename-input-${docId}`);
+    const novoNome = input.value.trim();
+    if (!novoNome) return;
+
+    try {
+      const res = await fetch(`/api/renomear-documento/${docId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ novo_nome: novoNome })
+      });
+      const data = await res.json();
+      if (data.sucesso) {
+        // Restaurar a linha com o novo nome
+        const row = document.getElementById(`doc-row-${docId}`);
+        const infoDiv = row.querySelector('.doc-item-info');
+        const actionsDiv = row.querySelector('.doc-actions');
+        infoDiv.innerHTML = `
+          <span>📄</span>
+          <a href="/ver_documento/${docId}" target="_blank" class="doc-item-link">${novoNome}</a>
+        `;
+        actionsDiv.innerHTML = `
+          <button class="btn-doc-action" onclick="iniciarRenomear(${docId}, '${novoNome.replace(/'/g,"\\'")}')">Editar nome</button>
+          <a href="/download-documento/${docId}" class="btn-doc-action" style="text-decoration:none;">Download</a>
+        `;
+        actionsDiv.style.opacity = '';
+      } else {
+        alert('Erro ao renomear: ' + (data.erro || 'Tenta novamente.'));
+      }
+    } catch (e) {
+      alert('Erro de rede ao renomear.');
+    }
+  }
+
+  function cancelarRenomear(docId, nomeOriginal) {
+    const row = document.getElementById(`doc-row-${docId}`);
+    const infoDiv = row.querySelector('.doc-item-info');
+    const actionsDiv = row.querySelector('.doc-actions');
+    infoDiv.innerHTML = `
+      <span>📄</span>
+      <a href="/ver_documento/${docId}" target="_blank" class="doc-item-link">${nomeOriginal}</a>
+    `;
+    actionsDiv.innerHTML = `
+      <button class="btn-doc-action" onclick="iniciarRenomear(${docId}, '${nomeOriginal.replace(/'/g,"\\'")}')">Editar nome</button>
+      <a href="/download-documento/${docId}" class="btn-doc-action" style="text-decoration:none;">Download</a>
+    `;
+    actionsDiv.style.opacity = '';
+  }
+
+  // ─── MODAL DE UPLOAD ──────────────────────────────────────────────
+  let pastasCarregadas = false;
+
+  async function abrirModalUpload() {
+    document.getElementById('upload-modal-backdrop').classList.add('open');
+    document.getElementById('upload-status-msg').textContent = '';
+    document.getElementById('upload-file-input').value = '';
+
+    if (!pastasCarregadas) {
+      await carregarPastasModal();
+      pastasCarregadas = true;
+    }
+  }
+
+  function fecharModalUpload(event) {
+    if (!event || event.target === document.getElementById('upload-modal-backdrop')) {
+      document.getElementById('upload-modal-backdrop').classList.remove('open');
+    }
+  }
+
+  async function carregarPastasModal() {
+    const sel = document.getElementById('upload-pasta-select');
+    sel.innerHTML = '<option value="">A carregar...</option>';
+    try {
+      const res = await fetch('/api/listar-pastas-templates');
+      const data = await res.json();
+      sel.innerHTML = '<option value="">— Selecionar pasta —</option>';
+
+      for (const [categoria, pastas] of Object.entries(data.pastas || {})) {
+        const grupo = document.createElement('optgroup');
+        grupo.label = categoria.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        for (const pasta of pastas) {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({ caminho: pasta.caminho, categoria: pasta.categoria });
+          opt.textContent = pasta.caminho.split('/').filter(Boolean).slice(-2).join(' / ');
+          grupo.appendChild(opt);
+        }
+        sel.appendChild(grupo);
+      }
+    } catch (e) {
+      sel.innerHTML = '<option value="">Erro ao carregar pastas</option>';
+    }
+  }
+
+  async function submeterUploadTemplate() {
+    const sel = document.getElementById('upload-pasta-select');
+    const fileInput = document.getElementById('upload-file-input');
+    const statusMsg = document.getElementById('upload-status-msg');
+
+    if (!sel.value) { statusMsg.style.color = '#e53e3e'; statusMsg.textContent = 'Seleciona uma pasta de destino.'; return; }
+    if (!fileInput.files.length) { statusMsg.style.color = '#e53e3e'; statusMsg.textContent = 'Seleciona um ficheiro.'; return; }
+
+    const { caminho, categoria } = JSON.parse(sel.value);
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('pasta', caminho);
+    formData.append('categoria', categoria);
+
+    statusMsg.style.color = 'var(--text-muted)';
+    statusMsg.textContent = 'A enviar...';
+
+    try {
+      const res = await fetch('/api/upload-template', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        statusMsg.style.color = '#38a169';
+        statusMsg.textContent = data.mensagem || 'Ficheiro adicionado com sucesso!';
+        setTimeout(() => {
+          fecharModalUpload();
+          window.location.reload(); // Recarregar para mostrar novo ficheiro
+        }, 1200);
+      } else {
+        statusMsg.style.color = '#e53e3e';
+        statusMsg.textContent = data.erro || 'Erro ao enviar ficheiro.';
+      }
+    } catch (e) {
+      statusMsg.style.color = '#e53e3e';
+      statusMsg.textContent = 'Erro de rede. Tenta novamente.';
+    }
+  }
 </script>
 {% endblock %}

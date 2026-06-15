@@ -3,33 +3,39 @@
 {% block title %}Novo Processo - Gest.AI{% endblock %}
 
 {% block extra_css %}
-  .container { max-width: 850px; margin: 0 auto; background: var(--panel-bg); padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px var(--shadow); transition: 0.3s; }
-  h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin-bottom: 10px; color: var(--title-color); }
-  .subtitle { color: var(--text-muted); margin-bottom: 30px; }
-  .section-title { font-size: 1.2rem; font-weight: 600; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin: 35px 0 20px; color: var(--primary); }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .full-width { grid-column: span 2; }
-  .form-group { margin-bottom: 15px; }
-  label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.95rem; color: var(--text); }
-  input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; box-sizing: border-box; font-family: inherit; background: var(--bg); color: var(--text); transition: 0.3s; }
-  input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
-  .info-badge { background: var(--btn-draft-bg); color: var(--primary); padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px; display: inline-block; }
-  .actions { margin-top: 40px; display: flex; gap: 15px; justify-content: flex-end; }
-  .btn { padding: 12px 28px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; border: none; font-size: 1rem; }
-  .btn-save { background: var(--primary); color: white; }
-  .btn-save:hover { background: var(--primary-hover); }
-  .btn-draft { background: var(--btn-draft-bg); color: var(--primary); border: 1px solid var(--primary); }
-  .btn-draft:hover { filter: brightness(0.95); }
-  .btn-cancel { background: var(--hover-bg); color: var(--text-muted); }
-  .btn-cancel:hover { background: var(--border); color: var(--text); }
-  .hidden { display: none; }
+.container { max-width: 850px; margin: 0 auto; background: var(--panel-bg); padding: 40px; border-radius: 12px;
+box-shadow: 0 4px 20px var(--shadow); transition: 0.3s; }
+h1 { font-family: 'DM Serif Display', serif; font-size: 2.2rem; margin-bottom: 10px; color: var(--title-color); }
+.subtitle { color: var(--text-muted); margin-bottom: 30px; }
+.section-title { font-size: 1.2rem; font-weight: 600; border-bottom: 2px solid var(--border); padding-bottom: 8px;
+margin: 35px 0 20px; color: var(--primary); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.full-width { grid-column: span 2; }
+.form-group { margin-bottom: 15px; }
+label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 0.95rem; color: var(--text); }
+input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size:
+1rem; box-sizing: border-box; font-family: inherit; background: var(--bg); color: var(--text); transition: 0.3s; }
+input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26,
+115, 232, 0.1); }
+.info-badge { background: var(--btn-draft-bg); color: var(--primary); padding: 8px 15px; border-radius: 6px; font-size:
+0.9rem; font-weight: 600; margin-bottom: 20px; display: inline-block; }
+.actions { margin-top: 40px; display: flex; gap: 15px; justify-content: flex-end; }
+.btn { padding: 12px 28px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; border: none;
+font-size: 1rem; }
+.btn-save { background: var(--primary); color: white; }
+.btn-save:hover { background: var(--primary-hover); }
+.btn-draft { background: var(--btn-draft-bg); color: var(--primary); border: 1px solid var(--primary); }
+.btn-draft:hover { filter: brightness(0.95); }
+.btn-cancel { background: var(--hover-bg); color: var(--text-muted); }
+.btn-cancel:hover { background: var(--border); color: var(--text); }
+.hidden { display: none; }
 {% endblock %}
 
 {% block content %}
 <div class="container">
   <h1>{{ titulo }}</h1>
   <p class="subtitle">Preencha os dados necessários para gerar os documentos do processo.</p>
-  
+
   <div class="info-badge">Regime: {{ regime_nome }}</div>
 
   <datalist id="lista-professores">
@@ -55,12 +61,12 @@
     <option value="2027/2028">
     <option value="2028/2029">
   </datalist>
-  
+
   <datalist id="lista-funcoes">
     <option value="Não exerce funções externas">
     <option value="Exerce funções externas">
   </datalist>
-  
+
   <datalist id="lista-ciclos">
     <option value="1º Ciclo (Licenciatura)">
     <option value="2º Ciclo (Mestrado)">
@@ -83,178 +89,207 @@
         <select id="docente_select">
           <option value="">-- Selecionar docente --</option>
           {% for prof in professores %}
-            <option value="{{ prof }}">{{ prof }}</option>
+          <option value="{{ prof }}">{{ prof }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group full-width">
         <label>Nome Completo do Docente *</label>
-        <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto" value="{{ form_data.get('nome_docente', '') if form_data else '' }}">
+        <input type="text" name="nome_docente" required placeholder="Ex: Prof. Dr. Helena Pinto"
+          value="{{ form_data.get('nome_docente', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Data de Início *</label>
-        <input type="date" name="data_inicio_contrato" required value="{{ form_data.get('data_inicio_contrato', '') if form_data else '' }}">
+        <input type="date" name="data_inicio_contrato" required
+          value="{{ form_data.get('data_inicio_contrato', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Data de Fim *</label>
-        <input type="date" name="data_fim_contrato" required value="{{ form_data.get('data_fim_contrato', '') if form_data else '' }}">
+        <input type="date" name="data_fim_contrato" required
+          value="{{ form_data.get('data_fim_contrato', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Ano Letivo *</label>
-        <input type="text" name="ano_letivo" list="lista-anos" autocomplete="off" required placeholder="Ex: 2025/2026" value="{{ form_data.get('ano_letivo', '') if form_data else '' }}">
+        <input type="text" name="ano_letivo" list="lista-anos" autocomplete="off" required placeholder="Ex: 2025/2026"
+          value="{{ form_data.get('ano_letivo', '') if form_data else '' }}">
       </div>
       <div class="form-group" id="ano-anterior-group">
         <label>Ano Anterior *</label>
-        <input type="text" name="ano_anterior" list="lista-anos" autocomplete="off" required placeholder="Ex: 2024/2025" value="{{ form_data.get('ano_anterior', '') if form_data else '' }}">
+        <input type="text" name="ano_anterior" list="lista-anos" autocomplete="off" required placeholder="Ex: 2024/2025"
+          value="{{ form_data.get('ano_anterior', '') if form_data else '' }}">
       </div>
       <div class="form-group">
         <label>Área de Contratação *</label>
-        <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required placeholder="Ex: Informática" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
+        <input type="text" name="area_contratacao" list="lista-areas" autocomplete="off" required
+          placeholder="Ex: Informática" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
       </div>
       <div class="form-group" id="horario-semanal-group" style="display:none;">
         <label>Horário Semanal</label>
         <select name="horario_semanal">
           <option value="">Escolher horário</option>
           {% for carga in cargas %}
-            <option value="Carga {{ carga.id_carga }}: {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{ carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)"
-              {% if form_data and form_data.get('horario_semanal', '') == ('Carga ' ~ carga.id_carga ~ ': ' ~ carga.tempo_contratual ~ 'h total / ' ~ carga.tempo_aulas ~ 'h aulas / ' ~ carga.tempo_apoio ~ 'h apoio / ' ~ carga.tempo_preparacao ~ 'h preparação (' ~ carga.percentagem ~ '%)') %}selected{% endif %}>
-              Carga {{ carga.id_carga }} — {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{ carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)
-            </option>
+          <option
+            value="Carga {{ carga.id_carga }}: {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{ carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)"
+            {% if form_data and form_data.get('horario_semanal', '' )==('Carga ' ~ carga.id_carga ~ '
+            : ' ~ carga.tempo_contratual ~ ' h total / ' ~ carga.tempo_aulas ~ ' h aulas / ' ~ carga.tempo_apoio ~ ' h
+            apoio / ' ~ carga.tempo_preparacao ~ ' h preparação (' ~ carga.percentagem ~ '%)' ) %}selected{% endif %}>
+            Carga {{ carga.id_carga }} — {{ carga.tempo_contratual }}h total / {{ carga.tempo_aulas }}h aulas / {{
+            carga.tempo_apoio }}h apoio / {{ carga.tempo_preparacao }}h preparação ({{ carga.percentagem }}%)
+          </option>
           {% endfor %}
         </select>
       </div>
       <div class="form-group">
         <label>Áreas Curriculares *</label>
-        <input type="text" name="areas_curriculares" list="lista-areas" autocomplete="off" required placeholder="Ex: Matemática e Física" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
+        <input type="text" name="areas_curriculares" list="lista-areas" autocomplete="off" required
+          placeholder="Ex: Matemática e Física" value="{{ form_data.get('areas_estudo', '') if form_data else '' }}">
       </div>
       <div class="form-group full-width">
         <label>Funções Externas</label>
-        <input type="text" name="funcoes_externas" list="lista-funcoes" autocomplete="off" value="{{ form_data.get('funcoes_externas', 'Não exerce funções externas') if form_data else 'Exerce funções externas' }}">
+        <input type="text" name="funcoes_externas" list="lista-funcoes" autocomplete="off"
+          value="{{ form_data.get('funcoes_externas', 'Não exerce funções externas') if form_data else 'Exerce funções externas' }}">
       </div>
     </div>
 
     <div class="section-title">Membros do Júri</div>
 
-<!-- Aviso de alerta, oculto por omissão -->
-<div id="aviso-juris" style="display:none; background: #fff3cd; border: 1px solid #ffc107; 
+    <!-- Aviso de alerta, oculto por omissão -->
+    <div id="aviso-juris" style="display:none; background: #fff3cd; border: 1px solid #ffc107; 
      color: #856404; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.9rem;">
-  Selecione primeiro o nome do docente para carregar os júris disponíveis.
-</div>
+      Selecione primeiro o nome do docente para carregar os júris disponíveis.
+    </div>
 
-<div class="form-grid">
-  <div class="form-group">
-    <label>Professor A</label>
-    <select name="profAAA" id="juri_A" required>
-      <option value="">-- Selecionar júri --</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>Professor B</label>
-    <select name="profBBB" id="juri_B" required>
-      <option value="">-- Selecionar júri --</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>Professor C</label>
-    <select name="profCCC" id="juri_C" required>
-      <option value="">-- Selecionar júri --</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>Professor D</label>
-    <select name="profDDD" id="juri_D" required>
-      <option value="">-- Selecionar júri --</option>
-    </select>
-  </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Professor A</label>
+        <select name="profAAA" id="juri_A" required>
+          <option value="">-- Selecionar júri --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Professor B</label>
+        <select name="profBBB" id="juri_B" required>
+          <option value="">-- Selecionar júri --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Professor C</label>
+        <select name="profCCC" id="juri_C" required>
+          <option value="">-- Selecionar júri --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Professor D</label>
+        <select name="profDDD" id="juri_D" required>
+          <option value="">-- Selecionar júri --</option>
+        </select>
+      </div>
 
-  <div class="form-group full-width">
-    <label>Presidente do Júri / Diretor</label>
-    <input type="text" name="profXXX" list="lista-diretor" autocomplete="off" required 
-           value="{{ form_data.get('profXXX', 'Prof. Dr. Germano Silva') }}">
-  </div>
-</div>
+      <div class="form-group full-width">
+        <label>Presidente do Júri / Diretor</label>
+        <input type="text" name="profXXX" list="lista-diretor" autocomplete="off" required
+          value="{{ form_data.get('profXXX', 'Prof. Dr. Germano Silva') }}">
+      </div>
+    </div>
 
     <div id="section-ucs">
-        <div class="section-title">Distribuição de Serviço (UCs)</div>
-        
-        <div id="lista-ucs-container">
-            <div class="form-grid uc-block">
-                <div class="form-group">
-                    <label>UC 1</label>
-                    <input type="text" name="uc_1" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_1', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Horas UC 1</label>
-                    <input type="number" name="horas_1" min="0" step="0.5" value="{{ form_data.get('horas_1', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Curso UC 1</label>
-                    <input type="text" name="curso_1" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_1', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Ciclo UC 1</label>
-                    <input type="text" name="ciclo_1" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_1', '') if form_data else '' }}">
-                </div>
-            </div>
-            
-            <div class="form-grid uc-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
-                <div class="form-group">
-                    <label>UC 2</label>
-                    <input type="text" name="uc_2" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_2', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Horas UC 2</label>
-                    <input type="number" name="horas_2" min="0" step="0.5" value="{{ form_data.get('horas_2', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Curso UC 2</label>
-                    <input type="text" name="curso_2" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_2', '') if form_data else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Ciclo UC 2</label>
-                    <input type="text" name="ciclo_2" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_2', '') if form_data else '' }}">
-                </div>
-            </div>
+      <div class="section-title">Distribuição de Serviço (UCs)</div>
 
-            {% if form_data %}
-                {% for i in range(3, 15) %}
-                    {% if form_data.get('uc_' ~ i) or form_data.get('horas_' ~ i) %}
-                    <div class="form-grid uc-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
-                        <div class="form-group"><label>UC {{ i }}</label><input type="text" name="uc_{{ i }}" list="lista-ucs" autocomplete="off" value="{{ form_data.get('uc_' ~ i, '') }}"></div>
-                        <div class="form-group"><label>Horas UC {{ i }}</label><input type="number" name="horas_{{ i }}" min="0" step="0.5" value="{{ form_data.get('horas_' ~ i, '') }}"></div>
-                        <div class="form-group"><label>Curso UC {{ i }}</label><input type="text" name="curso_{{ i }}" list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_' ~ i, '') }}"></div>
-                        <div class="form-group"><label>Ciclo UC {{ i }}</label><input type="text" name="ciclo_{{ i }}" list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_' ~ i, '') }}"></div>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
+      <div id="lista-ucs-container">
+        <div class="form-grid uc-block">
+          <div class="form-group">
+            <label>UC 1</label>
+            <input type="text" name="uc_1" list="lista-ucs" autocomplete="off"
+              value="{{ form_data.get('uc_1', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Horas UC 1</label>
+            <input type="number" name="horas_1" min="0" step="0.5"
+              value="{{ form_data.get('horas_1', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Curso UC 1</label>
+            <input type="text" name="curso_1" list="lista-cursos" autocomplete="off"
+              value="{{ form_data.get('curso_1', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Ciclo UC 1</label>
+            <input type="text" name="ciclo_1" list="lista-ciclos" autocomplete="off"
+              value="{{ form_data.get('ciclo_1', '') if form_data else '' }}">
+          </div>
         </div>
 
-        <div style="text-align: center; margin-top: 20px;">
-            <button type="button" class="btn btn-draft" style="padding: 8px 20px; font-size: 0.95rem; border-radius: 20px;" onclick="adicionarNovaUC()">+ Adicionar outra UC</button>
+        <div class="form-grid uc-block"
+          style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
+          <div class="form-group">
+            <label>UC 2</label>
+            <input type="text" name="uc_2" list="lista-ucs" autocomplete="off"
+              value="{{ form_data.get('uc_2', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Horas UC 2</label>
+            <input type="number" name="horas_2" min="0" step="0.5"
+              value="{{ form_data.get('horas_2', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Curso UC 2</label>
+            <input type="text" name="curso_2" list="lista-cursos" autocomplete="off"
+              value="{{ form_data.get('curso_2', '') if form_data else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Ciclo UC 2</label>
+            <input type="text" name="ciclo_2" list="lista-ciclos" autocomplete="off"
+              value="{{ form_data.get('ciclo_2', '') if form_data else '' }}">
+          </div>
         </div>
 
-        <div class="form-grid" style="margin-top: 25px;">
-            <div class="form-group full-width">
-                <label>Total de Horas de Contacto</label>
-                
-                <div id="total_horas_integral" style="display:none; padding: 12px; background: var(--hover-bg); border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; color: var(--text);">
-                    <strong>35 horas (Tempo Integral)</strong>
-                </div>
-                <input type="hidden" name="total_horas_contacto" value="35" id="total_horas_contacto_hidden">
-                <!-- id_carga é enviado ao submeter para o backend identificar a carga correta -->
-                <input type="hidden" name="id_carga" id="id_carga_hidden" value="">
-                
-                <select id="total_horas_contacto" style="display:none;" onchange="sincronizarIdCarga(this)">
-                    <option value="">Escolher carga horária...</option>
-                </select>
-            </div>
+        {% if form_data %}
+        {% for i in range(3, 15) %}
+        {% if form_data.get('uc_' ~ i) or form_data.get('horas_' ~ i) %}
+        <div class="form-grid uc-block"
+          style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
+          <div class="form-group"><label>UC {{ i }}</label><input type="text" name="uc_{{ i }}" list="lista-ucs"
+              autocomplete="off" value="{{ form_data.get('uc_' ~ i, '') }}"></div>
+          <div class="form-group"><label>Horas UC {{ i }}</label><input type="number" name="horas_{{ i }}" min="0"
+              step="0.5" value="{{ form_data.get('horas_' ~ i, '') }}"></div>
+          <div class="form-group"><label>Curso UC {{ i }}</label><input type="text" name="curso_{{ i }}"
+              list="lista-cursos" autocomplete="off" value="{{ form_data.get('curso_' ~ i, '') }}"></div>
+          <div class="form-group"><label>Ciclo UC {{ i }}</label><input type="text" name="ciclo_{{ i }}"
+              list="lista-ciclos" autocomplete="off" value="{{ form_data.get('ciclo_' ~ i, '') }}"></div>
         </div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      </div>
+
+      <div style="text-align: center; margin-top: 20px;">
+        <button type="button" class="btn btn-draft" style="padding: 8px 20px; font-size: 0.95rem; border-radius: 20px;"
+          onclick="adicionarNovaUC()">+ Adicionar outra UC</button>
+      </div>
+
+      <div class="form-grid" style="margin-top: 25px;">
+        <div class="form-group full-width">
+          <label>Total de Horas de Contacto</label>
+
+          <div id="total_horas_integral"
+            style="display:none; padding: 12px; background: var(--hover-bg); border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; color: var(--text);">
+            <strong>35 horas (Tempo Integral)</strong>
+          </div>
+          <input type="hidden" name="total_horas_contacto" value="35" id="total_horas_contacto_hidden">
+          <!-- id_carga é enviado ao submeter para o backend identificar a carga correta -->
+          <input type="hidden" name="id_carga" id="id_carga_hidden" value="">
+
+          <select id="total_horas_contacto" style="display:none;" onchange="sincronizarIdCarga(this)">
+            <option value="">Escolher carga horária...</option>
+          </select>
+        </div>
+      </div>
     </div>
-    
+
     <div class="section-title">Observações</div>
     <div class="form-group">
-      <textarea name="relatorio_juri" placeholder="Relatório ou notas adicionais...">{{ form_data.get('relatorio_juri', '') if form_data else '' }}</textarea>
+      <textarea name="relatorio_juri"
+        placeholder="Relatório ou notas adicionais...">{{ form_data.get('relatorio_juri', '') if form_data else '' }}</textarea>
     </div>
 
     <div class="actions">
@@ -271,12 +306,12 @@
   let cargasDisponíveis = [];
   const CAMPOS_JURI = ['juri_A', 'juri_B', 'juri_C', 'juri_D'];
 
-document.addEventListener('DOMContentLoaded', async function() {
+  document.addEventListener('DOMContentLoaded', async function () {
     const tipo = "{{ tipo }}";
     const anoAnteriorGroup = document.getElementById('ano-anterior-group');
     const docenteDropdownGroup = document.getElementById('docente-dropdown-group');
     const horarioSemanalGroup = document.getElementById('horario-semanal-group');
-    
+
     const totalHorasIntegral = document.getElementById('total_horas_integral');
     const totalHorasDropdown = document.getElementById('total_horas_contacto');
 
@@ -290,18 +325,18 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (docenteDropdownGroup) docenteDropdownGroup.style.display = 'block';
       if (totalHorasIntegral) totalHorasIntegral.style.display = 'block';
       if (totalHorasDropdown) totalHorasDropdown.style.display = 'none';
-      
+
     } else if (tipo === 'renovacao-parcial' || tipo === 'primeira-vez') {
       // Como a Primeira Vez também é parcial, ambas abrem o Dropdown da BD!
       if (tipo === 'renovacao-parcial') {
         if (docenteDropdownGroup) docenteDropdownGroup.style.display = 'block';
         if (horarioSemanalGroup) horarioSemanalGroup.style.display = 'block';
       }
-      
+
       // Mostrar o dropdown das horas que vem da Base de Dados
       if (totalHorasIntegral) totalHorasIntegral.style.display = 'none';
       if (totalHorasDropdown) totalHorasDropdown.style.display = 'block';
-      
+
       // Carregar as horas da base de dados (11, 16, etc.)
       await carregarCargasHorias();
     }
@@ -310,15 +345,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     const nomeDocenteInput = document.querySelector('input[name="nome_docente"]');
 
     if (docenteSelect && nomeDocenteInput) {
-      docenteSelect.addEventListener('change', function() {
+      docenteSelect.addEventListener('change', function () {
         const nome = this.value;
         if (nome) {
           nomeDocenteInput.value = nome;
           preencherDadosDocente(nome);
+          carregarJuris(nome);
         }
       });
 
-      nomeDocenteInput.addEventListener('blur', function() {
+      nomeDocenteInput.addEventListener('blur', function () {
         const nome = this.value.trim();
         if (nome) {
           preencherDadosDocente(nome);
@@ -331,14 +367,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   function adicionarNovaUC() {
     const ucInputs = document.querySelectorAll('input[name^="uc_"]');
     const novaUCIndex = ucInputs.length + 1;
-    
+
     const container = document.getElementById('lista-ucs-container');
     const novaUC = document.createElement('div');
     novaUC.className = 'form-grid uc-block';
     novaUC.style.marginTop = '15px';
     novaUC.style.paddingTop = '15px';
     novaUC.style.borderTop = '1px dashed var(--border)';
-    
+
     novaUC.innerHTML = `
         <div class="form-group">
             <label>UC ${novaUCIndex}</label>
@@ -364,10 +400,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
       const response = await fetch('/api/cargas-horias');
       if (!response.ok) return;
-      
+
       const data = await response.json();
       cargasDisponíveis = data.cargas;
-      
+
       const select = document.getElementById('total_horas_contacto');
       if (select) {
         while (select.options.length > 1) {
@@ -406,7 +442,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const aviso = document.getElementById('aviso-juris');
 
     if (!nomeDocente) {
-      CAMPOS_JURI.forEach(id => {
+      CAMPOS_JURI.forEach((id) => {
         const sel = document.getElementById(id);
         if (sel) {
           sel.innerHTML = '<option value="">-- Selecionar júri --</option>';
@@ -428,7 +464,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
       }
 
-      CAMPOS_JURI.forEach(id => {
+      CAMPOS_JURI.forEach((id) => {
         const sel = document.getElementById(id);
         if (!sel) return;
         const valorAtual = sel.value;
@@ -466,35 +502,35 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (!response.ok) return;
 
       const result = await response.json();
-      
+
       // Percorrer TODAS as chaves devolvidas pelo servidor
       Object.entries(result).forEach(([key, value]) => {
-         if (value) {
-            // Se o histórico tiver a "UC 4", precisamos de clicar no botão automaticamente
-            // até que a caixa da UC 4 apareça no ecrã para a podermos preencher!
-            if (key.startsWith('uc_') || key.startsWith('horas_') || key.startsWith('curso_') || key.startsWith('ciclo_')) {
-                const parts = key.split('_');
-                const idx = parseInt(parts[parts.length - 1]);
-                
-                if (!isNaN(idx)) {
-                    while (document.querySelectorAll('input[name^="uc_"]').length < idx) {
-                        if (typeof adicionarNovaUC === "function") {
-                            adicionarNovaUC();
-                        } else {
-                            break;
-                        }
-                    }
+        if (value) {
+          // Se o histórico tiver a "UC 4", precisamos de clicar no botão automaticamente
+          // até que a caixa da UC 4 apareça no ecrã para a podermos preencher!
+          if (key.startsWith('uc_') || key.startsWith('horas_') || key.startsWith('curso_') || key.startsWith('ciclo_')) {
+            const parts = key.split('_');
+            const idx = parseInt(parts[parts.length - 1]);
+
+            if (!isNaN(idx)) {
+              while (document.querySelectorAll('input[name^="uc_"]').length < idx) {
+                if (typeof adicionarNovaUC === "function") {
+                  adicionarNovaUC();
+                } else {
+                  break;
                 }
+              }
             }
-            
-            // Preencher a caixa que corresponda ao nome (ex: name="profAAA", name="uc_1", etc)
-            const input = document.querySelector(`[name="${key}"]`);
-            if (input && (!input.value || input.value.trim() === '')) {
-              input.value = value;
-            }
-         }
+          }
+
+          // Preencher a caixa que corresponda ao nome (ex: name="profAAA", name="uc_1", etc)
+          const input = document.querySelector(`[name="${key}"]`);
+          if (input && (!input.value || input.value.trim() === '')) {
+            input.value = value;
+          }
+        }
       });
-      
+
       // Preencher o dropdown de total_horas_contacto
       if (result.total_horas_contacto) {
         const selectHoras = document.getElementById('total_horas_contacto');
@@ -506,7 +542,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
       // --- JÚRIS: carregar da API excluindo o próprio docente ---
       await carregarJuris(nome);
-      
+
       // Preencher o dropdown de horario_semanal se existir
       if (result.horario_semanal) {
         const selectHorario = document.querySelector('select[name="horario_semanal"]');

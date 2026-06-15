@@ -1403,6 +1403,91 @@ def apagar_linha():
     cursor.close()
     return jsonify({"status": "sucesso"})
 
+@app.route('/api/listar-pastas-templates')
+def listar_pastas_templates():
+    """Devolve as pastas únicas de templates disponíveis, agrupadas por categoria."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT DISTINCT categoria, caminho 
+            FROM documentos 
+            WHERE categoria IN ('tempo integral anual', 'tempo parcial semestral', 'tempo parcial edital')
+            AND caminho NOT LIKE '%Modelos Gerados%'
+        """)
+        docs = cursor.fetchall()
+        cursor.close()
+
+        pastas = {}
+        vistos = set()
+
+        for doc in docs:
+            cat = doc['categoria']
+            caminho_pasta = os.path.dirname(doc['caminho'])
+            if not caminho_pasta or caminho_pasta in vistos:
+                continue
+            vistos.add(caminho_pasta)
+
+            if cat not in pastas:
+                pastas[cat] = []
+            pastas[cat].append({
+                "label": caminho_pasta,
+                "caminho": caminho_pasta,
+                "categoria": cat
+            })
+
+        return jsonify({"pastas": pastas})
+    except Exception as e:
+        print(f"[!] Erro ao listar pastas de templates: {e}")
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route('/api/upload-template', methods=['POST'])
+def upload_template():
+    """Faz upload de um ficheiro para uma pasta de templates existente e regista na BD."""
+    if 'file' not in request.files:
+        return jsonify({"erro": "Nenhum ficheiro enviado."}), 400
+
+    ficheiro = request.files['file']
+    caminho_destino = request.form.get('pasta', '').strip()
+    categoria = request.form.get('categoria', '').strip()
+
+    if not ficheiro.filename or not caminho_destino or not categoria:
+        return jsonify({"erro": "Dados incompletos: ficheiro, pasta e categoria são obrigatórios."}), 400
+
+    # Validar categoria para evitar injeção
+    if categoria not in TIPOS_DOCUMENTOS_PERMITIDOS:
+        return jsonify({"erro": "Categoria inválida."}), 400
+
+    try:
+        ROOT_DIR = os.path.dirname(BASE_DIR)
+        pasta_abs = os.path.join(ROOT_DIR, caminho_destino)
+
+        if not os.path.exists(pasta_abs):
+            return jsonify({"erro": f"Pasta de destino não existe: {caminho_destino}"}), 400
+
+        nome_seguro = secure_filename(ficheiro.filename)
+        caminho_abs_ficheiro = os.path.join(pasta_abs, nome_seguro)
+        ficheiro.save(caminho_abs_ficheiro)
+
+        caminho_relativo = os.path.join(caminho_destino, nome_seguro).replace('\\', '/')
+
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "INSERT INTO documentos (nome, caminho, categoria, data_upload) VALUES (%s, %s, %s, %s)",
+            (nome_seguro, caminho_relativo, categoria, datetime.now().isoformat())
+        )
+        db.commit()
+        cursor.close()
+
+        print(f"[OK] Template adicionado: {caminho_relativo} (categoria: {categoria})")
+        return jsonify({"mensagem": f"'{nome_seguro}' adicionado com sucesso!", "nome": nome_seguro}), 200
+    except Exception as e:
+        print(f"[!] Erro no upload de template: {e}")
+        return jsonify({"erro": str(e)}), 500
+
+
 @app.route('/api/renomear-documento/<int:doc_id>', methods=['POST'])
 def renomear_documento(doc_id):
     """Renomeia um documento."""
