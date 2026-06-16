@@ -57,8 +57,9 @@ def inicializar_rag():
         model_path=model_path,
         n_gpu_layers=-1,
         n_ctx=8192,
-        temperature=0.1,
+        temperature=0,
         verbose=False,
+        stop=["<|im_end|>", ";"],
     )
 
     # llama-cpp nativa (para o prompt RAG final, mais controlo)
@@ -170,11 +171,6 @@ def responder_pergunta(
         conhecimento = "Não possuis qualquer informação disponível sobre este assunto."
 
     instrucao = ""
-    if pasta_forçada:
-        instrucao += f"Foca-te prioritariamente na informação da pasta '{pasta_forçada}'."
-    if anos:
-        instrucao += f" Presta especial atenção aos períodos: {', '.join(anos)}."
-
     # --- Prompt final ---
     prompt = f"""<|im_start|>system
 És o Gest.AI, um assistente de recursos humanos e gestão académica.
@@ -207,11 +203,11 @@ REGRA 7: Quando fizeres querys às tabelas, verifica todas as tabelas a que faze
         return f"Erro ao gerar resposta: {e}", ""
 
     # Adiciona fontes usadas
-    if pasta_forçada:
+    ###if pasta_forçada:
         fontes = list({d.metadata.get("source", "?") for d in docs if d.metadata.get("pasta") == pasta_forçada})
         if fontes:
             fontes_str = ", ".join(fontes)
             if f"*(Fonte: {fontes_str})*" not in resposta:
-                resposta += f"\n\n*(Fonte: {fontes_str})*"
+                resposta += f"\n\n*(Fonte: {fontes_str})*"###
 
     return resposta, contexto_docs

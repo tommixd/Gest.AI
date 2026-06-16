@@ -16,6 +16,18 @@ adicionar um novo template:
 import re
 import mysql.connector
 from db_config import DB_CONFIG
+import json
+
+def _formatar_juri (rows: list[dict], nome: str) -> str:
+    if not rows:
+        return None
+    
+    is_juri = rows[0].get("isJuri")
+
+    if is_juri in [1, True, "sim"]:
+        return f"Sim, o docente '{nome}' pertence ao júri."
+    else:
+        return f"Não, o docente '{nome}' não pertence ao júri."
 
 def _formatar_contagem(rows: list[dict], nome: str) -> str:
     total = rows[0].get("total_contratos", 0)
@@ -28,7 +40,7 @@ def _formatar_contagem(rows: list[dict], nome: str) -> str:
  
 def _formatar_historico(rows: list[dict], nome: str) -> str:
     if not rows:
-        return f"Não foram encontrados contratos para '{nome}'."
+        return None
     linhas = [f"Histórico de contratos de '{nome}':"]
     for r in rows:
         linhas.append(
@@ -41,11 +53,25 @@ def _formatar_historico(rows: list[dict], nome: str) -> str:
  
 def _formatar_ucs(rows: list[dict], nome: str) -> str:
     if not rows:
-        return f"Não foram encontradas UCs para o contrato mais recente de '{nome}'."
-    linhas = [f"UCs do contrato mais recente de '{nome}':"]
-    for r in rows:
-        linhas.append(f"  • {r['uc']} — {r['horas_atribuidas']}h atribuídas")
-    return "\n".join(linhas)
+        return None
+    
+    dados_str = rows[0].get("dados_historico")
+    if not dados_str:
+        return None
+    try: 
+        dados = json.loads(dados_str)
+    except: 
+        return None
+    
+    ucs = []
+    for key, value in dados.items():
+        if key.startswith("uc_") and value:
+            ucs.append((value))
+    if not ucs:
+        return None
+    
+    return f"As unidades curriculares do contrato de '{nome}' são: {', '.join(ucs)}."
+
  
  
 def _formatar_renovacoes(rows: list[dict], nome: str) -> str:
@@ -55,7 +81,7 @@ def _formatar_renovacoes(rows: list[dict], nome: str) -> str:
  
 def _formatar_documentos(rows: list[dict], nome: str) -> str:
     if not rows:
-        return f"Não foram encontrados documentos para '{nome}'."
+        return None
     linhas = [f"Documentos de '{nome}':"]
     for r in rows:
         linhas.append(
@@ -66,7 +92,7 @@ def _formatar_documentos(rows: list[dict], nome: str) -> str:
  
 def _formatar_carga(rows: list[dict], nome: str) -> str:
     if not rows:
-        return f"Não foram encontrados dados de carga horária para '{nome}'."
+        return None
     linhas = [f"Carga horária do contrato mais recente de '{nome}':"]
     r = rows[0]
     linhas.append(f"  • Tempo contratual: {r['tempo_contratual']}h")
@@ -77,20 +103,73 @@ def _formatar_carga(rows: list[dict], nome: str) -> str:
     return "\n".join(linhas)
  
  
-def _formatar_docentes_departamento(rows: list[dict], nome: str) -> str:
+def tentar_template(pergunta: str) -> str | None:
+    """
+    Verifica se a pergunta bate com algum template.
+    Se sim, executa a query parametrizada diretamente (sem LLM) e devolve
+    o resultado já formatado como texto.
+    Se não houver match, devolve None e o SQL Agent trata a pergunta.
+ 
+    Args:
+        pergunta: Pergunta em linguagem natural do utilizador.
+ 
+    Returns:
+        String com a resposta formatada, ou None se nenhum template bater.
+    """
+    for nome_template, config in TEMPLATES.items():
+        for padrao in config["padroes"]:
+            match = re.search(padrao, pergunta) # Mantém sem IGNORECASE
+            if match:
+                # Pega no grupo 1 se existir (nome), senão fica vazio (perguntas globais)
+                parametro = match.group(1).strip() if match.groups() else ""
+                param_sql = f"%{parametro}%"
+ 
+                print(f"[Template] Match: '{nome_template}' | Parâmetro: '{parametro}'")
+ 
+                try:
+                    conn   = mysql.connector.connect(**DB_CONFIG)
+                    cursor = conn.cursor(dictionary=True)
+                    
+                    # Só passa a tupla (param_sql,) se a query tiver '%s'
+                    if "%s" in config["query"]:
+                        cursor.execute(config["query"], (param_sql,))
+                    else:
+                        cursor.execute(config["query"])
+                        
+                    rows   = cursor.fetchall()
+                    cursor.close()
+                    conn.close()
+ 
+                    return config["formatar"](rows, parametro)
+ 
+                except Exception as e:
+                    print(f"[Template] Erro em '{nome_template}': {e}")
+                    return None
+ 
+    return None
+
+def _formatar_listar_juris(rows: list[dict], parametro: str) -> str | None:
     if not rows:
-        return f"Não foram encontrados docentes no departamento '{nome}'."
-    linhas = [f"Docentes do departamento '{nome}':"]
-    for r in rows:
-        linhas.append(f"  • {r['nome']} ({r['tipo_docente']})")
-    return "\n".join(linhas)
- 
- 
-# ---------------------------------------------------------------------------
-# Dicionário de templates
-# ---------------------------------------------------------------------------
- 
+        return None
+    nomes = [r["nome"] for r in rows]
+    return "Os seguintes docentes fazem parte do júri: " + ", ".join(nomes) + "."
+
+
 TEMPLATES = {
+
+    "docente_juri": {
+        "padroes": [
+            r"(?:o|a).+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+).+?j[uú]ri",
+            r"j[uú]ri.+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)",
+            r"([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+).+j[uú]ri",
+        ],
+        "query": """
+            SELECT isJuri 
+            FROM docentes 
+            WHERE nome LIKE %s LIMIT 1
+        """,
+        "formatar": _formatar_juri,
+    },
  
     "contratos_docente": {
         "padroes": [
@@ -133,19 +212,12 @@ TEMPLATES = {
         "padroes": [
             r"unidades? curriculares?.+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)",
             r"(?:ucs?|cadeiras?|disciplinas?).+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+)",
-            r"([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+).+(?:ucs?|cadeiras?|disciplinas?|lecciona|ensina)",
+            r"([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)+).+(?:ucs?|cadeiras?|disciplinas?|leciona|ensina)",
         ],
         "query": """
-            SELECT u.nome AS uc, cu.horas_atribuidas
-            FROM contrato_ucs cu
-            JOIN ucs u ON cu.ucs_id = u.id
-            WHERE cu.contratos_id_contrato = (
-                SELECT id_contrato FROM contratos
-                WHERE docentes_id_docente = (
-                    SELECT id_docente FROM docentes WHERE nome LIKE %s LIMIT 1
-                )
-                ORDER BY data_renovacao DESC LIMIT 1
-            )
+            SELECT dados_historico 
+            FROM docentes 
+            WHERE nome LIKE %s LIMIT 1
         """,
         "formatar": _formatar_ucs,
     },
@@ -205,64 +277,18 @@ TEMPLATES = {
         "formatar": _formatar_carga,
     },
  
-    "docentes_departamento": {
+    
+
+    # No teu dicionário TEMPLATES, junta este novo bloco:
+    "listar_todos_juris": {
         "padroes": [
-            r"docentes?.+departamento.+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)",
-            r"quem.+(?:é|são|pertence).+departamento.+?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)",
+            r"que docentes s[ãa]o j[uú]ris?",
+            r"quais s[ãa]o os j[uú]ris?",
+            r"lista.+j[uú]ris",
         ],
         "query": """
-            SELECT nome, tipo_docente
-            FROM docentes
-            WHERE departamento LIKE %s
-            ORDER BY nome
+            SELECT nome FROM docentes WHERE isJuri = 'sim'
         """,
-        "formatar": _formatar_docentes_departamento,
-        "param_tipo": "departamento",  # indica que o parâmetro não é um nome de docente
+        "formatar": _formatar_listar_juris,
     },
 }
- 
- 
-# ---------------------------------------------------------------------------
-# Função principal
-# ---------------------------------------------------------------------------
- 
-def tentar_template(pergunta: str) -> str | None:
-    """
-    Verifica se a pergunta bate com algum template.
-    Se sim, executa a query parametrizada diretamente (sem LLM) e devolve
-    o resultado já formatado como texto.
-    Se não houver match, devolve None e o SQL Agent trata a pergunta.
- 
-    Args:
-        pergunta: Pergunta em linguagem natural do utilizador.
- 
-    Returns:
-        String com a resposta formatada, ou None se nenhum template bater.
-    """
-    for nome_template, config in TEMPLATES.items():
-        for padrao in config["padroes"]:
-            match = re.search(padrao, pergunta, re.IGNORECASE)
-            if match:
-                parametro = match.group(1).strip()
- 
-                # Para templates de departamento o parâmetro já é o departamento
-                # Para todos os outros é um nome de docente
-                param_sql = f"%{parametro}%"
- 
-                print(f"[Template] Match: '{nome_template}' | Parâmetro: '{parametro}'")
- 
-                try:
-                    conn   = mysql.connector.connect(**DB_CONFIG)
-                    cursor = conn.cursor(dictionary=True)
-                    cursor.execute(config["query"], (param_sql,))
-                    rows   = cursor.fetchall()
-                    cursor.close()
-                    conn.close()
- 
-                    return config["formatar"](rows, parametro)
- 
-                except Exception as e:
-                    print(f"[Template] Erro em '{nome_template}': {e}")
-                    return None  # fallback para o SQL Agent
- 
-    return None  # nenhum template bateu

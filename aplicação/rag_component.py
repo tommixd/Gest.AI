@@ -67,7 +67,8 @@ def construir_retriever(
     # --- Índice FAISS ---
     vectorstore = FAISS.from_documents(chunks, embeddings)
     retriever = vectorstore.as_retriever(
-        search_kwargs={"k": k, "fetch_k": fetch_k}
+        search_type="similarity_score_threshold",
+        search_kwargs={"k": k, "fetch_k": fetch_k, "score_threshold": 0.5}
     )
 
     print("[RAG] Índice FAISS criado.")
