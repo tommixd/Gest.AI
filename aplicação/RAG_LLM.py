@@ -170,6 +170,10 @@ def responder_pergunta(
     if not conhecimento:
         conhecimento = "Não possuis qualquer informação disponível sobre este assunto."
 
+    #breach de segurança
+    if "Alerta de Segurança:" in conhecimento:
+        print("[Orquestrador] Curto-circuito devido a alerta de segurança. LLM abortada.")
+        return "Alerta de Segurança: A inserção de código SQL direto não é permitida. Por favor, formule a sua questão em linguagem natural.", ""
     instrucao = ""
     # --- Prompt final ---
     prompt = f"""<|im_start|>system

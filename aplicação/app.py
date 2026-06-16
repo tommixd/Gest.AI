@@ -8,7 +8,6 @@ import shutil
 import mysql.connector
 from datetime import datetime, date
 from pathlib import Path
-#vários imports ainda não utilizados mas que serão uteis para futuras funcionalidades (ex: gestão de utilizadores, autenticação, etc.)
 from flask import Flask, render_template, g, request, send_file, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename 
@@ -1143,7 +1142,12 @@ def consulta_docentes():
     dept = request.args.get('departamento', '').strip()
     tipo = request.args.get('tipo_contrato', '').strip()
     ano = request.args.get('ano_letivo', '').strip()
-    
+    semestre = request.args.get('semestre', '').strip()  # 'anual' | 'semestral' | ''
+
+    # Tipos de contrato que correspondem a cada periodicidade
+    TIPOS_ANUAIS     = ['Tempo Integral']
+    TIPOS_SEMESTRAIS = ['Tempo Parcial', 'Tempo Parcial Edital']
+
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -1170,6 +1174,16 @@ def consulta_docentes():
             params.append(tipo)
             params.append(f"%{tipo}%")
 
+        if semestre:
+            # Se o filtro tipo já fez o JOIN, não repetimos; caso contrário fazemos aqui
+            if not tipo:
+                joins.append("LEFT JOIN contratos c ON d.id_docente = c.docentes_id_docente")
+                joins.append("LEFT JOIN templates t ON c.templates_id_template = t.id_template")
+            tipos_alvo = TIPOS_ANUAIS if semestre == 'anual' else TIPOS_SEMESTRAIS
+            placeholders = ', '.join(['%s'] * len(tipos_alvo))
+            where_clauses.append(f"t.tipo_contrato IN ({placeholders})")
+            params.extend(tipos_alvo)
+
         if ano:
             where_clauses.append("(d.dados_historico LIKE %s OR EXISTS (SELECT 1 FROM rascunhos r WHERE r.nome_docente = d.nome AND r.dados_formulario LIKE %s))")
             params.append(f"%{ano}%")
@@ -1179,6 +1193,47 @@ def consulta_docentes():
         
         cursor.execute(final_query, tuple(params))
         docentes = cursor.fetchall()
+
+        # Para cada docente, buscar o resumo dos contratos (tipo + ano letivo)
+        TIPO_LEGIVEL = {
+            "Tempo Integral":       "Tempo Integral",
+            "Tempo Parcial":        "Tempo Parcial",
+            "Tempo Parcial Edital": "Tempo Parcial (Edital)",
+        }
+        for d in docentes:
+            cursor.execute("""
+                SELECT c.id_contrato, c.data_renovacao,
+                       t.tipo_contrato,
+                       (SELECT doc.caminho FROM documentos doc
+                        WHERE doc.contratos_id_contrato = c.id_contrato LIMIT 1) AS caminho_doc
+                FROM contratos c
+                LEFT JOIN templates t ON c.templates_id_template = t.id_template
+                WHERE c.docentes_id_docente = %s
+                ORDER BY c.data_renovacao DESC
+            """, (d['id_docente'],))
+            contratos_raw = cursor.fetchall()
+
+            resumo = []
+            for c in contratos_raw:
+                tipo_label = TIPO_LEGIVEL.get(c['tipo_contrato'], c['tipo_contrato'] or 'Contrato')
+                # Extrair ano letivo do caminho do documento (ex: .../2025-2026/...)
+                ano_letivo = None
+                if c['caminho_doc']:
+                    partes = c['caminho_doc'].replace('\\', '/').split('/')
+                    ano_letivo = next(
+                        (p for p in partes if '-' in p and len(p) == 9 and p[:4].isdigit()),
+                        None
+                    )
+                data_str = None
+                if c['data_renovacao']:
+                    data_str = c['data_renovacao'].isoformat() if hasattr(c['data_renovacao'], 'isoformat') else str(c['data_renovacao'])
+                resumo.append({
+                    "id_contrato": c['id_contrato'],
+                    "tipo": tipo_label,
+                    "ano_letivo": ano_letivo or data_str or '—',
+                })
+            d['contratos_resumo'] = resumo
+            d['num_contratos'] = len(resumo)
         
         cursor.close()
         return jsonify({"docentes": docentes})

@@ -78,6 +78,37 @@
     .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
     .tab { padding: 10px 20px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--text-muted); }
     .tab.active { border-bottom-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+    /* Badge de contratos */
+    .badge-contratos {
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--primary); color: white;
+        border-radius: 12px; font-size: 0.7rem; font-weight: 700;
+        padding: 2px 8px; margin-left: 8px; cursor: pointer;
+        user-select: none; transition: background 0.2s;
+    }
+    .badge-contratos:hover { background: var(--primary-hover); }
+    .badge-contratos.zero { background: var(--text-muted); }
+
+    /* Linha expansível de contratos */
+    .contratos-expand-row { display: none; }
+    .contratos-expand-row.open { display: table-row; }
+    .contratos-expand-cell {
+        padding: 0 20px 14px 36px !important;
+        border-top: none !important;
+    }
+    .contratos-lista {
+        display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px;
+    }
+    .contrato-chip {
+        display: flex; align-items: center; gap: 6px;
+        background: var(--hover-bg); border: 1px solid var(--border);
+        border-radius: 8px; padding: 6px 12px; font-size: 0.82rem;
+    }
+    .contrato-chip .chip-tipo { font-weight: 600; color: var(--primary); }
+    .contrato-chip .chip-ano { color: var(--text-muted); font-size: 0.75rem; }
+    .toggle-arrow { display: inline-block; transition: transform 0.2s; font-size: 0.75rem; color: var(--text-muted); margin-left: 4px; }
+    .toggle-arrow.open { transform: rotate(90deg); }
 </style>
 {% endblock %}
 
@@ -117,6 +148,14 @@
                     <label>Ano Letivo</label>
                     <select id="query-ano" onchange="consultarDocentes()">
                         <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="search-field">
+                    <label>Semestre</label>
+                    <select id="query-semestre" onchange="consultarDocentes()">
+                        <option value="">Todos</option>
+                        <option value="anual">Anual</option>
+                        <option value="semestral">Semestral</option>
                     </select>
                 </div>
             </div>
@@ -253,8 +292,9 @@
         const dept = document.getElementById('query-dept').value;
         const tipo = document.getElementById('query-tipo').value;
         const ano = document.getElementById('query-ano').value;
+        const semestre = document.getElementById('query-semestre').value;
 
-        const params = new URLSearchParams({ nome, departamento: dept, tipo_contrato: tipo, ano_letivo: ano });
+        const params = new URLSearchParams({ nome, departamento: dept, tipo_contrato: tipo, ano_letivo: ano, semestre });
         const res = await fetch(`/api/consulta-docentes?${params.toString()}`);
         const data = await res.json();
         
@@ -263,24 +303,70 @@
 
         if (data.docentes && data.docentes.length > 0) {
             data.docentes.forEach(doc => {
+                const isRealJuri = doc.isJuri === 'sim' && doc.tipo_docente === 'carreira';
+                const juriBadge = isRealJuri
+                    ? `<span style="background: #34c759; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">JÚRI</span>`
+                    : '';
+
+                const numContratos = doc.num_contratos || 0;
+                const badgeClass = numContratos === 0 ? 'badge-contratos zero' : 'badge-contratos';
+                const badgeTitle = numContratos === 0 ? 'Sem contratos registados' : `${numContratos} contrato${numContratos > 1 ? 's' : ''}`;
+                const expandId = `expand-${doc.id_docente}`;
+                const arrowId = `arrow-${doc.id_docente}`;
+
+                // Linha principal do docente
                 const tr = document.createElement('tr');
                 tr.style.borderTop = '1px solid var(--border)';
-                // isJuri na BD é "sim" ou "não". Apenas carreira pode ser júri.
-                const isRealJuri = doc.isJuri === 'sim' && doc.tipo_docente === 'carreira';
-                const juriBadge = isRealJuri ? `<span style="background: #34c759; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">JÚRI</span>` : '';
                 tr.innerHTML = `
-                    <td style="padding: 15px 20px; font-weight: 600;">${doc.nome} ${juriBadge}</td>
+                    <td style="padding: 15px 20px; font-weight: 600;">
+                        ${doc.nome} ${juriBadge}
+                        ${numContratos > 0 ? `
+                            <span class="${badgeClass}" title="${badgeTitle}" onclick="toggleContratos('${expandId}', '${arrowId}')">
+                                ${numContratos} contrato${numContratos > 1 ? 's' : ''}
+                                <span id="${arrowId}" class="toggle-arrow">▶</span>
+                            </span>` : `<span class="${badgeClass}" title="${badgeTitle}">sem contratos</span>`}
+                    </td>
                     <td style="padding: 15px 20px;">${doc.departamento || '---'}</td>
-                    <td style="padding: 15px 20px;"><span style="background: var(--hover-bg); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${doc.tipo_docente || '---'}</span></td>
+                    <td style="padding: 15px 20px;">
+                        <span style="background: var(--hover-bg); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${doc.tipo_docente || '---'}</span>
+                    </td>
                     <td style="padding: 15px 20px; text-align: center;">
                         <button class="btn-ui" style="padding: 5px 12px; font-size: 0.8rem;" onclick="verDetalheDocente(${doc.id_docente})">Ver Tudo</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
+
+                // Linha expansível com os chips de cada contrato
+                if (numContratos > 0) {
+                    const chips = (doc.contratos_resumo || []).map(c => `
+                        <div class="contrato-chip">
+                            <span class="chip-tipo">${c.tipo}</span>
+                            <span class="chip-ano">${c.ano_letivo}</span>
+                        </div>
+                    `).join('');
+
+                    const trExpand = document.createElement('tr');
+                    trExpand.id = expandId;
+                    trExpand.className = 'contratos-expand-row';
+                    trExpand.innerHTML = `
+                        <td class="contratos-expand-cell" colspan="4">
+                            <div class="contratos-lista">${chips}</div>
+                        </td>
+                    `;
+                    tbody.appendChild(trExpand);
+                }
             });
         } else {
             tbody.innerHTML = '<tr><td colspan="4" style="padding: 30px; text-align: center; color: var(--text-muted);">Nenhum docente encontrado com estes filtros.</td></tr>';
         }
+    }
+
+    function toggleContratos(expandId, arrowId) {
+        const row = document.getElementById(expandId);
+        const arrow = document.getElementById(arrowId);
+        if (!row) return;
+        const isOpen = row.classList.toggle('open');
+        if (arrow) arrow.classList.toggle('open', isOpen);
     }
 
     async function verDetalheDocente(id) {

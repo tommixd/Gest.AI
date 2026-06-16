@@ -38,6 +38,25 @@ def criar_sql_agent(llm: BaseLLM, tabelas_permitidas: list[str] | None = None):
     return {"db": db, "llm": llm}
 
 def consultar_bd(pergunta: str, agente: dict) -> str | None:
+    p_lower = pergunta.lower().strip()
+    is_sql_injection = False
+    
+    comandos_iniciais = ["select ", "update ", "delete ", "insert ", "drop ", "alter ", "create "]
+    
+    # Regra 1: A pergunta começa DIRETAMENTE com um comando SQL? (Ex: "SELECT * FROM...")
+    if any(p_lower.startswith(cmd) for cmd in comandos_iniciais):
+        is_sql_injection = True
+        
+    # Regra 2: Contém estruturas relacionais exclusivas de SQL no meio do texto?
+    elif ("select " in p_lower and "from " in p_lower) or \
+         ("update " in p_lower and "set " in p_lower) or \
+         ("insert into " in p_lower):
+        is_sql_injection = True
+
+    if is_sql_injection:
+        print("[Segurança] Tentativa de injeção SQL bloqueada por heurística.")
+        return "Alerta de Segurança: A inserção de código SQL direto não é permitida. Por favor, formule a sua questão em linguagem natural."
+    
     db = agente["db"]
     llm = agente["llm"]
     
@@ -48,9 +67,12 @@ def consultar_bd(pergunta: str, agente: dict) -> str | None:
 A tua ÚNICA função é traduzir a pergunta do utilizador para código SQL (SELECT) puro.
 
 REGRAS OBRIGATÓRIAS:
+REGRAS OBRIGATÓRIAS:
 1. Apenas código SQL. Sem formatação markdown (```sql) e sem texto extra.
 2. Usa SEMPRE `LIKE '%termo%'` em vez de `=`.
-3. REGRA DE OURO: A coluna 'tipo_contrato' NÃO EXISTE na tabela 'contratos'. Para saberes o tipo de contrato, tens OBRIGATORIAMENTE de fazer JOIN com a tabela 'templates' (ex: JOIN templates t ON c.templates_id_template = t.id_template).
+3. REGRA 1 (Templates): A coluna 'tipo_contrato' NÃO EXISTE na tabela 'contratos'. Para extrair o tipo, usa o JOIN: `JOIN templates t ON c.templates_id_template = t.id_template`.
+4. REGRA 2 (Otimização Carga Horária): Se a pergunta solicitar APENAS a relação entre horas e percentagens (ex: 50%), acede DIRETAMENTE à tabela 'carga_horaria' sem efetuar JOINs com outras tabelas.
+5. REGRA 3 (Relação Docentes-Contratos): Para associar nomes de docentes a tipos de contrato (ex: "tempo integral"), usa OBRIGATORIAMENTE a tripla junção: `FROM docentes d JOIN contratos c ON d.id_docente = c.docentes_id_docente JOIN templates t ON c.templates_id_template = t.id_template`.
 
 EXEMPLOS DE COMPORTAMENTO OBRIGATÓRIO (IMITA ISTO):
 
@@ -62,6 +84,12 @@ SQL: SELECT DISTINCT dados_historico->>'$.area_contratacao' FROM docentes WHERE 
 
 Pergunta: Qual é o tipo de contrato mais comum?
 SQL: SELECT t.tipo_contrato, COUNT(*) FROM contratos c JOIN templates t ON c.templates_id_template = t.id_template GROUP BY t.tipo_contrato ORDER BY COUNT(*) DESC LIMIT 1;
+
+Pergunta: Quantas horas de apoio tem um contrato a tempo parcial de 50% de carga horaria?
+SQL: SELECT tempo_apoio FROM carga_horaria WHERE percentagem LIKE '%50%' LIMIT 1;
+
+Pergunta: Quais são os docentes a tempo integral?
+SQL: SELECT DISTINCT d.nome FROM docentes d JOIN contratos c ON d.id_docente = c.docentes_id_docente JOIN templates t ON c.templates_id_template = t.id_template WHERE t.tipo_contrato LIKE '%integral%';
 
 ESQUEMA DA BASE DE DADOS:
 {esquema}
