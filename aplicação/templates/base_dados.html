@@ -120,7 +120,9 @@
         <div style="display: flex; gap: 10px;">
             <button id="view-mode-btn" class="btn-ui" onclick="switchView('consulta')">Consulta Avançada</button>
             <button id="table-mode-btn" class="btn-ui" style="background: var(--text-muted);" onclick="switchView('tabelas')">Ver Tabelas</button>
+            {% if current_user.is_admin %}
             <button id="edit-toggle-btn" class="btn-ui" style="display:none;" onclick="toggleEditMode()">Editar</button>
+            {% endif %}
         </div>
     </div>
 
@@ -187,9 +189,11 @@
             
             <input type="text" id="search-input" oninput="filtrarTabela()" placeholder="🔍 Pesquisar na tabela..." style="flex: 3; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
             
+            {% if current_user.is_admin %}
             <div class="edit-only">
                 <button class="btn-add-row" onclick="adicionarLinha()">+ Nova Linha</button>
             </div>
+            {% endif %}
         </div>
 
         <div style="overflow-x: auto; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px var(--shadow);">
@@ -238,6 +242,7 @@
 
 {% block scripts %}
 <script>
+    const IS_ADMIN = {{ current_user.is_admin | tojson }};
     let currentView = 'consulta';
 
     // 1. Inicialização
@@ -467,6 +472,7 @@
 
     // 2. Modo Edição (Toggle)
     function toggleEditMode() {
+        if (!IS_ADMIN) return; // Funcionário normal não pode entrar em modo edição
         document.body.classList.toggle('edit-mode');
         const btn = document.getElementById('edit-toggle-btn');
         const isEdit = document.body.classList.contains('edit-mode');
@@ -515,7 +521,7 @@
             thAction.className = 'edit-only';
             thAction.style.padding = '15px 20px';
             thAction.style.textAlign = 'center';
-            trHead.appendChild(thAction);
+            if (IS_ADMIN) trHead.appendChild(thAction);
             thead.appendChild(trHead);
 
             data.dados.forEach(row => {
@@ -545,14 +551,16 @@
                             td.appendChild(btnVer);
                         } else {
                             td.textContent = cellText;
-                            td.classList.add('editable-cell');
-                            td.contentEditable = document.body.classList.contains('edit-mode') ? "true" : "false";
-                            td.addEventListener('blur', async (e) => {
-                                const newVal = e.target.textContent;
-                                if (newVal !== cellText) {
-                                    await saveCell(table, pk_col, row[pk_col], h, newVal);
-                                }
-                            });
+                            if (IS_ADMIN) {
+                                td.classList.add('editable-cell');
+                                td.contentEditable = document.body.classList.contains('edit-mode') ? "true" : "false";
+                                td.addEventListener('blur', async (e) => {
+                                    const newVal = e.target.textContent;
+                                    if (newVal !== cellText) {
+                                        await saveCell(table, pk_col, row[pk_col], h, newVal);
+                                    }
+                                });
+                            }
                         }
                     }
                     tr.appendChild(td);
@@ -563,13 +571,14 @@
                 tdAction.style.borderTop = '1px solid var(--border)';
                 tdAction.style.textAlign = 'center';
                 tdAction.innerHTML = `<button class="btn-delete-row" style="margin: 0 auto;" onclick="apagarLinha('${table}', '${pk_col}', '${row[pk_col]}')">-</button>`;
-                tr.appendChild(tdAction);
+                if (IS_ADMIN) tr.appendChild(tdAction);
                 tbody.appendChild(tr);
             });
         }
     }
 
     async function adicionarLinha() {
+        if (!IS_ADMIN) return;
         const table = document.getElementById('select-tabelas').value;
         await fetch('/api/adicionar-linha', {
             method: 'POST',
@@ -580,6 +589,7 @@
     }
 
     async function apagarLinha(table, id_col, id_val) {
+        if (!IS_ADMIN) return;
         if (!confirm("Apagar esta linha?")) return;
         await fetch('/api/apagar-linha', {
             method: 'POST',

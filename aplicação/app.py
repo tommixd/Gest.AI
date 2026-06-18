@@ -10,9 +10,14 @@ from datetime import datetime, date
 from pathlib import Path
 from flask import Flask, render_template, g, request, send_file, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_required, current_user
 from werkzeug.utils import secure_filename 
 from functools import wraps
-from db_config import DB_CONFIG
+from db_config import DB_CONFIG, SQLALCHEMY_DATABASE_URI
+
+from models import db, bcrypt, Funcionario
+from auth import auth_bp, admin_required
+from admin import admin_bp
 
 # --- GARANTIR IMPORTAÇÃO CORRETA DO RAG_LLM ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -39,7 +44,34 @@ except ImportError:
 
 # Inicializa a aplicação
 app = Flask(__name__)
-app.config["SITE_NAME"] = "Gest.AI"  
+app.config["SITE_NAME"] = "Gest.AI"
+
+# --- AUTENTICAÇÃO (Flask-Login + SQLAlchemy + Bcrypt) ---
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "altera-esta-chave-em-producao")
+app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+bcrypt.init_app(app)
+
+login_manager = LoginManager()
+login_manager.login_view = "auth.login"
+login_manager.login_message = "Inicia sessão para aceder a esta página."
+login_manager.login_message_category = "erro"
+login_manager.init_app(app)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Funcionario.query.get(int(user_id))
+
+
+# Garante que a tabela de funcionários existe (não afeta as restantes tabelas MySQL já existentes)
+with app.app_context():
+    db.create_all()
+
+app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
 
 
 LABELS_HISTORICO = {
@@ -325,7 +357,8 @@ def close_connection(exception):
         db.close()
 
 
-@app.route('/')  
+@app.route('/')
+@login_required
 def index():
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -383,6 +416,7 @@ def index():
 
 
 @app.route('/contratacao/<tipo>')
+@login_required
 def iniciar_contratacao(tipo):
     titulos = {
         'renovacao-integral': 'Renovação de Contrato (Integral)',
@@ -469,6 +503,7 @@ def iniciar_contratacao(tipo):
                            cargas=lista_cargas)
 
 @app.route('/api/juris-disponiveis')
+@login_required
 def juris_disponiveis():
     """Devolve docentes com isJuri = 'sim', excluindo o proprio docente"""
     nome_docente = request.args.get('excluir', '').strip()
@@ -494,6 +529,7 @@ def juris_disponiveis():
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/docente-detalhes')
+@login_required
 def docente_detalhes():
     nome = request.args.get('nome', '').strip()
     if not nome:
@@ -558,6 +594,7 @@ def docente_detalhes():
 
 
 @app.route('/api/cargas-horias')
+@login_required
 def cargas_horias():
     """Retorna a lista de cargas horárias disponíveis da base de dados."""
     try:
@@ -597,6 +634,7 @@ def cargas_horias():
 
 
 @app.route('/submeter-contratacao', methods=['POST'])
+@login_required
 def submeter_contratacao():
     dados = request.get_json()
     tipo = dados.get('tipo')
@@ -759,6 +797,7 @@ def submeter_contratacao():
 
 
 @app.route('/guardar-rascunho', methods=['POST'])
+@login_required
 def rota_guardar_rascunho():
     dados = request.get_json()
     
@@ -790,6 +829,7 @@ def rota_guardar_rascunho():
         # Removi o db.close() daqui para não fechar a ligação prematuramente. O @app.teardown_appcontext trata disso.
 
 @app.route('/meus-rascunhos')
+@login_required
 def ver_rascunhos():
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -800,6 +840,7 @@ def ver_rascunhos():
     return render_template('pasta_rascunhos.html', rascunhos=lista_rascunhos)
 
 @app.route('/upload-documento', methods=['POST'])
+@admin_required
 def upload_documento():
     # Verifica se a requisição contém ficheiros
     if 'file' not in request.files:
@@ -852,6 +893,7 @@ def upload_documento():
         return jsonify({"erro": f"Erro interno ao processar o upload: {e}"}), 500
 
 @app.route('/chat', methods=['POST'])
+@login_required
 def chat():
     dados = request.json
     msg = dados.get('message', '')
@@ -864,6 +906,7 @@ def chat():
         return jsonify({"reply": f"Erro: {e}"}), 500
 
 @app.route('/ver_documento/<int:doc_id>')
+@login_required
 def ver_documento(doc_id):
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -879,6 +922,7 @@ def ver_documento(doc_id):
     return "Não encontrado", 404
 
 @app.route('/download-documento/<int:doc_id>')
+@login_required
 def download_documento(doc_id):
     """Força o download do documento (sem abrir no browser)."""
     db = get_db()
@@ -896,6 +940,7 @@ def download_documento(doc_id):
 
 # --- ROTAS DE ELIMINAÇÃO ---
 @app.route('/api/apagar-todos-rascunhos', methods=['DELETE'])
+@login_required
 def apagar_todos_rascunhos():
     """Apaga todos os rascunhos da base de dados."""
     try:
@@ -912,6 +957,7 @@ def apagar_todos_rascunhos():
         return jsonify({"sucesso": False, "erro": str(e)}), 500
 
 @app.route('/api/apagar-rascunho/<int:rascunho_id>', methods=['DELETE'])
+@login_required
 def apagar_rascunho(rascunho_id):
     """Apaga um rascunho específico da base de dados."""
     try:
@@ -928,6 +974,7 @@ def apagar_rascunho(rascunho_id):
         return jsonify({"sucesso": False, "erro": str(e)}), 500
 
 @app.route('/api/apagar-documento/<int:doc_id>', methods=['DELETE'])
+@admin_required
 def apagar_documento(doc_id):
     """Apaga um documento específico - INCLUINDO toda a pasta do contrato na BD e no disco."""
     try:
@@ -1030,6 +1077,7 @@ def apagar_documento(doc_id):
         return jsonify({"sucesso": False, "erro": str(e)}), 500
 
 @app.route('/api/apagar-pasta/<caso>', methods=['DELETE'])
+@admin_required
 def apagar_pasta(caso):
     """Apaga todos os documentos de uma pasta/caso específico."""
     try:
@@ -1101,10 +1149,12 @@ def apagar_pasta(caso):
 #    return render_template('importar.html')
 
 @app.route('/base-dados')
+@login_required
 def explorar_bd():
     return render_template('base_dados.html')
 
 @app.route('/api/filtros-disponiveis')
+@login_required
 def filtros_disponiveis():
     """Retorna os valores únicos para os filtros da consulta."""
     try:
@@ -1136,6 +1186,7 @@ def filtros_disponiveis():
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/consulta-docentes')
+@login_required
 def consulta_docentes():
     """Consulta avançada de docentes com filtros."""
     nome = request.args.get('nome', '').strip()
@@ -1242,6 +1293,7 @@ def consulta_docentes():
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/detalhe-docente/<int:id_docente>')
+@login_required
 def detalhe_docente(id_docente):
     """Retorna todos os dados associados a um docente usando a estrutura completa."""
     try:
@@ -1338,6 +1390,7 @@ def detalhe_docente(id_docente):
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/procurar-docente')
+@login_required
 def procurar_docente():
     nome = request.args.get('q', '').strip()
     if not nome:
@@ -1376,6 +1429,7 @@ def procurar_docente():
     
 
 @app.route('/api/lista-tabelas')
+@login_required
 def lista_tabelas():
     try:
         db = get_db()
@@ -1389,6 +1443,7 @@ def lista_tabelas():
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/dados-tabela/<table_name>')
+@login_required
 def dados_tabela(table_name):
     try:
         db = get_db()
@@ -1411,6 +1466,7 @@ def dados_tabela(table_name):
         return jsonify({"erro": str(e)}), 500
     
 @app.route('/api/update-cell', methods=['POST'])
+@admin_required
 def update_cell():
     data = request.json
     table = data.get('table')
@@ -1433,6 +1489,7 @@ def update_cell():
         return jsonify({"status": "erro", "message": str(e)}), 500
     
 @app.route('/api/adicionar-linha', methods=['POST'])
+@admin_required
 def adicionar_linha():
     data = request.json
     table = data.get('table')
@@ -1445,6 +1502,7 @@ def adicionar_linha():
     return jsonify({"status": "sucesso"})
 
 @app.route('/api/apagar-linha', methods=['POST'])
+@admin_required
 def apagar_linha():
     data = request.json
     table = data.get('table')
@@ -1459,6 +1517,7 @@ def apagar_linha():
     return jsonify({"status": "sucesso"})
 
 @app.route('/api/listar-pastas-templates')
+@admin_required
 def listar_pastas_templates():
     """Devolve as pastas únicas de templates disponíveis, agrupadas por categoria."""
     try:
@@ -1498,6 +1557,7 @@ def listar_pastas_templates():
 
 
 @app.route('/api/upload-template', methods=['POST'])
+@admin_required
 def upload_template():
     """Faz upload de um ficheiro para uma pasta de templates existente e regista na BD."""
     if 'file' not in request.files:
@@ -1544,6 +1604,7 @@ def upload_template():
 
 
 @app.route('/api/renomear-documento/<int:doc_id>', methods=['POST'])
+@admin_required
 def renomear_documento(doc_id):
     """Renomeia um documento."""
     try:

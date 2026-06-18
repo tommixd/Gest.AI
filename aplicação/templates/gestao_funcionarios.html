@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Funcionários - Gest.AI{% endblock %}
+
+{% block extra_css %}
+  .funcionarios-section { background: var(--panel-bg); border-radius: 12px; padding: 30px; box-shadow: 0 4px 20px var(--shadow); border: 1px solid var(--border); }
+  .funcionarios-title { font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin: 0; color: var(--title-color); }
+
+  .funcionarios-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 25px; }
+
+  .btn-novo-funcionario { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .btn-novo-funcionario:hover { background: var(--primary-hover); }
+
+  table.tabela-funcionarios { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  table.tabela-funcionarios th { text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border-bottom: 2px solid var(--border); padding: 10px 12px; }
+  table.tabela-funcionarios td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+  table.tabela-funcionarios tr:last-child td { border-bottom: none; }
+
+  .badge-role { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge-admin { background: var(--btn-draft-bg); color: var(--primary); }
+  .badge-funcionario { background: var(--hover-bg); color: var(--text-muted); }
+
+  .badge-status { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge-ativo { background: #e6f4ea; color: #1e8e3e; }
+  .badge-inativo { background: #fdecea; color: #c5221f; }
+  [data-theme="dark"] .badge-ativo { background: #1f3a26; color: #6fcf97; }
+  [data-theme="dark"] .badge-inativo { background: #3a2020; color: #ff8a80; }
+
+  .tabela-acoes { display: flex; gap: 8px; }
+  .btn-acao { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); font-family: 'Outfit', sans-serif; transition: 0.15s; }
+  .btn-acao:hover { background: var(--hover-bg); color: var(--text); border-color: var(--primary); }
+  .btn-acao.danger:hover { border-color: #e53e3e; color: #e53e3e; }
+
+  /* Modal de criar/editar funcionário */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; display: none; align-items: center; justify-content: center; }
+  .modal-backdrop.open { display: flex; }
+  .modal-box { background: var(--panel-bg); border-radius: 14px; padding: 32px; width: 420px; max-width: 95vw; box-shadow: 0 8px 40px rgba(0,0,0,0.2); border: 1px solid var(--border); }
+  .modal-box h3 { margin: 0 0 6px 0; font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--title-color); }
+  .modal-box p.subtitle { margin: 0 0 22px 0; color: var(--text-muted); font-size: 0.88rem; }
+  .field-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; display: block; }
+  .modal-box input, .modal-box select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.95rem; margin-bottom: 16px; box-sizing: border-box; }
+  .modal-box input:focus, .modal-box select:focus { outline: none; border-color: var(--primary); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .btn-cancel { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 9px 20px; border-radius: 8px; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 0.9rem; transition: 0.15s; }
+  .btn-cancel:hover { background: var(--hover-bg); }
+  .btn-submit { background: var(--primary); color: white; border: none; padding: 9px 22px; border-radius: 8px; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600; transition: 0.15s; }
+  .btn-submit:hover { background: var(--primary-hover); }
+  .form-status { font-size: 0.85rem; margin-top: 4px; min-height: 18px; }
+  .form-status.erro { color: #c5221f; }
+  .form-status.sucesso { color: #1e8e3e; }
+{% endblock %}
+
+{% block content %}
+  <div class="funcionarios-section">
+    <div class="funcionarios-header">
+      <h2 class="funcionarios-title">Gestão de Funcionários</h2>
+      <button class="btn-novo-funcionario" onclick="abrirModalCriar()">＋ Novo Funcionário</button>
+    </div>
+
+    <table class="tabela-funcionarios">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Username</th>
+          <th>Perfil</th>
+          <th>Estado</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="lista-funcionarios">
+        {% for f in funcionarios %}
+        <tr id="func-row-{{ f.id }}">
+          <td>{{ f.nome }}</td>
+          <td>{{ f.username }}</td>
+          <td>
+            <span class="badge-role {% if f.role == 'admin' %}badge-admin{% else %}badge-funcionario{% endif %}">
+              {{ 'Admin' if f.role == 'admin' else 'Funcionário' }}
+            </span>
+          </td>
+          <td>
+            <span class="badge-status {% if f.ativo %}badge-ativo{% else %}badge-inativo{% endif %}">
+              {{ 'Ativo' if f.ativo else 'Inativo' }}
+            </span>
+          </td>
+          <td class="tabela-acoes">
+            <button class="btn-acao" onclick="abrirModalPassword({{ f.id }}, '{{ f.nome | replace("'", "\\'") }}')">Alterar password</button>
+            {% if f.id != current_user.id %}
+              <button class="btn-acao" onclick="alternarEstado({{ f.id }}, {{ f.ativo | tojson }})">
+                {{ 'Desativar' if f.ativo else 'Ativar' }}
+              </button>
+              <button class="btn-acao danger" onclick="apagarFuncionario({{ f.id }}, '{{ f.nome | replace("'", "\\'") }}')">Apagar</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal: Criar Funcionário -->
+  <div class="modal-backdrop" id="modal-criar">
+    <div class="modal-box">
+      <h3>Novo Funcionário</h3>
+      <p class="subtitle">Cria uma conta de acesso para um novo funcionário.</p>
+
+      <label class="field-label">Nome</label>
+      <input type="text" id="novo-nome" placeholder="Nome completo">
+
+      <label class="field-label">Username</label>
+      <input type="text" id="novo-username" placeholder="ex: jsilva">
+
+      <label class="field-label">Password</label>
+      <input type="password" id="novo-password" placeholder="Mínimo 6 caracteres">
+
+      <label class="field-label">Perfil</label>
+      <select id="novo-role">
+        <option value="funcionario">Funcionário</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <div class="form-status" id="status-criar"></div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="fecharModal('modal-criar')">Cancelar</button>
+        <button class="btn-submit" onclick="criarFuncionario()">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Alterar Password -->
+  <div class="modal-backdrop" id="modal-password">
+    <div class="modal-box">
+      <h3>Alterar Password</h3>
+      <p class="subtitle" id="password-subtitle"></p>
+
+      <label class="field-label">Nova Password</label>
+      <input type="password" id="nova-password" placeholder="Mínimo 6 caracteres">
+
+      <div class="form-status" id="status-password"></div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="fecharModal('modal-password')">Cancelar</button>
+        <button class="btn-submit" onclick="confirmarAlterarPassword()">Guardar</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let idFuncionarioAtual = null;
+
+  function abrirModalCriar() {
+    document.getElementById('novo-nome').value = '';
+    document.getElementById('novo-username').value = '';
+    document.getElementById('novo-password').value = '';
+    document.getElementById('novo-role').value = 'funcionario';
+    document.getElementById('status-criar').textContent = '';
+    document.getElementById('status-criar').className = 'form-status';
+    document.getElementById('modal-criar').classList.add('open');
+  }
+
+  function abrirModalPassword(id, nome) {
+    idFuncionarioAtual = id;
+    document.getElementById('password-subtitle').textContent = `A definir nova password para ${nome}.`;
+    document.getElementById('nova-password').value = '';
+    document.getElementById('status-password').textContent = '';
+    document.getElementById('status-password').className = 'form-status';
+    document.getElementById('modal-password').classList.add('open');
+  }
+
+  function fecharModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  window.addEventListener('click', function (event) {
+    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+      if (event.target === modal) modal.classList.remove('open');
+    });
+  });
+
+  async function criarFuncionario() {
+    const nome = document.getElementById('novo-nome').value.trim();
+    const username = document.getElementById('novo-username').value.trim();
+    const password = document.getElementById('novo-password').value;
+    const role = document.getElementById('novo-role').value;
+    const statusEl = document.getElementById('status-criar');
+
+    if (!nome || !username || !password) {
+      statusEl.textContent = 'Preenche todos os campos.';
+      statusEl.className = 'form-status erro';
+      return;
+    }
+
+    try {
+      const resp = await fetch('/admin/api/funcionarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, username, password, role })
+      });
+      const data = await resp.json();
+
+      if (resp.ok && data.sucesso) {
+        statusEl.textContent = 'Funcionário criado com sucesso!';
+        statusEl.className = 'form-status sucesso';
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        statusEl.textContent = data.erro || 'Erro ao criar funcionário.';
+        statusEl.className = 'form-status erro';
+      }
+    } catch (e) {
+      statusEl.textContent = 'Erro de ligação ao servidor.';
+      statusEl.className = 'form-status erro';
+    }
+  }
+
+  async function confirmarAlterarPassword() {
+    const password = document.getElementById('nova-password').value;
+    const statusEl = document.getElementById('status-password');
+
+    if (!password || password.length < 6) {
+      statusEl.textContent = 'A password deve ter pelo menos 6 caracteres.';
+      statusEl.className = 'form-status erro';
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/admin/api/funcionarios/${idFuncionarioAtual}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      const data = await resp.json();
+
+      if (resp.ok && data.sucesso) {
+        statusEl.textContent = 'Password atualizada!';
+        statusEl.className = 'form-status sucesso';
+        setTimeout(() => fecharModal('modal-password'), 600);
+      } else {
+        statusEl.textContent = data.erro || 'Erro ao atualizar password.';
+        statusEl.className = 'form-status erro';
+      }
+    } catch (e) {
+      statusEl.textContent = 'Erro de ligação ao servidor.';
+      statusEl.className = 'form-status erro';
+    }
+  }
+
+  async function alternarEstado(id, ativoAtual) {
+    try {
+      const resp = await fetch(`/admin/api/funcionarios/${id}/estado`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativo: !ativoAtual })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.sucesso) {
+        window.location.reload();
+      } else {
+        alert(data.erro || 'Erro ao atualizar estado.');
+      }
+    } catch (e) {
+      alert('Erro de ligação ao servidor.');
+    }
+  }
+
+  async function apagarFuncionario(id, nome) {
+    if (!confirm(`Tens a certeza que queres apagar "${nome}"? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      const resp = await fetch(`/admin/api/funcionarios/${id}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (resp.ok && data.sucesso) {
+        document.getElementById(`func-row-${id}`).remove();
+      } else {
+        alert(data.erro || 'Erro ao apagar funcionário.');
+      }
+    } catch (e) {
+      alert('Erro de ligação ao servidor.');
+    }
+  }
+</script>
+{% endblock %}

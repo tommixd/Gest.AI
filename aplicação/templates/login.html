@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Gest.AI</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-hover: #1557b0;
+      --bg: #f5f7fa;
+      --text: #333333;
+      --text-muted: #666666;
+      --border: #dddddd;
+      --panel-bg: #ffffff;
+      --title-color: #1a1a1a;
+      --shadow: rgba(0,0,0,0.08);
+      --error-bg: #fdecea;
+      --error-text: #c5221f;
+    }
+
+    [data-theme="dark"] {
+      --primary: #5c9cfa;
+      --primary-hover: #8abfff;
+      --bg: #121212;
+      --text: #e0e0e0;
+      --text-muted: #aaaaaa;
+      --border: #333333;
+      --panel-bg: #1e1e1e;
+      --title-color: #ffffff;
+      --shadow: rgba(0,0,0,0.5);
+      --error-bg: #3a2020;
+      --error-text: #ff8a80;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .login-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 30px var(--shadow);
+      padding: 40px;
+      width: 380px;
+      max-width: 90vw;
+    }
+
+    .logo-container {
+      text-decoration: none;
+      font-family: 'DM Serif Display', serif;
+      font-size: 2.2rem;
+      color: var(--title-color);
+      display: block;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .logo-container span { color: var(--primary); }
+
+    .login-subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin-bottom: 28px;
+    }
+
+    .field-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      margin-bottom: 18px;
+      box-sizing: border-box;
+    }
+    .field-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.98rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Outfit', sans-serif;
+    }
+    .btn-login:hover { background: var(--primary-hover); }
+
+    .flash-erro {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      margin-bottom: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <a href="/" class="logo-container">Gest<span>.AI</span></a>
+    <p class="login-subtitle">Inicia sessão para continuar</p>
+
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% for categoria, mensagem in mensagens %}
+        <div class="flash-erro">{{ mensagem }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST">
+      <label class="field-label" for="username">Utilizador</label>
+      <input class="field-input" type="text" id="username" name="username" required autofocus autocomplete="username">
+
+      <label class="field-label" for="password">Password</label>
+      <input class="field-input" type="password" id="password" name="password" required autocomplete="current-password">
+
+      <button type="submit" class="btn-login">Entrar</button>
+    </form>
+  </div>
+
+</body>
+</html>

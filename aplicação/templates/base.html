@@ -94,14 +94,22 @@
 
           {% if request.path == '/' %}
             <button class="btn-nav-link active" data-panel="chat" onclick="switchPanel('chat', this)">Assistente</button>
-            <button class="btn-nav-link" data-panel="upload" onclick="switchPanel('upload', this)">Documentos</button>
+            {% if current_user.is_admin %}
+              <button class="btn-nav-link" data-panel="upload" onclick="switchPanel('upload', this)">Documentos</button>
+            {% endif %}
           {% else %}
             <a href="/" class="btn-nav-link">Assistente</a>
-            <a href="/?tab=documentos" class="btn-nav-link">Documentos</a>
+            {% if current_user.is_admin %}
+              <a href="/?tab=documentos" class="btn-nav-link">Documentos</a>
+            {% endif %}
           {% endif %}
           
           <a href="/base-dados" class="btn-nav-link {% if request.path == '/base-dados' %}active{% endif %}">Consulta BD</a>
           <!-- <a href="/importar-historico" class="btn-nav-link {% if request.path == '/importar-historico' %}active{% endif %}">Importar Histórico</a> -->
+
+          {% if current_user.is_admin %}
+            <a href="/admin/funcionarios" class="btn-nav-link {% if request.path == '/admin/funcionarios' %}active{% endif %}">Funcionários</a>
+          {% endif %}
 
           <a href="/meus-rascunhos" class="btn-rascunhos-global">
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
@@ -111,6 +119,8 @@
           <button onclick="document.getElementById('modal-processo-global').classList.add('active')" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-family: 'Outfit', sans-serif; transition: 0.2s;">
             + Novo Processo
           </button>
+
+          <a href="/logout" class="btn-nav-link" title="Terminar sessão">Sair</a>
       </nav>
   </header>
 
