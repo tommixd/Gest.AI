@@ -6,5 +6,6 @@ aplicação/**/*.pyc
 aplicação/**/*.pyo
 
 *.mwb
-BD_GestAI.mwb.bak
+BaseDadosGestAI.mwb
+BaseDadosGestAI.mwb.bak
 *.env
