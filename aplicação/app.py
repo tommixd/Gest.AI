@@ -36,18 +36,18 @@ except Exception as e:
     def inicializar_rag(): return None, None, None
 
 try:
-    from templates import processar_renovacao
+    from templates import validar_juris
     print("[OK] Motor de templates importado com sucesso.")
 except ImportError:
     print("[!] Aviso: Não foi possível importar templates.py. A usar lógica interna.")
-    def processar_renovacao(dados): return None
+    def validar_juris(dados): return None
 
 # Inicializa a aplicação
 app = Flask(__name__)
 app.config["SITE_NAME"] = "Gest.AI"
 
 # --- AUTENTICAÇÃO (Flask-Login + SQLAlchemy + Bcrypt) ---
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "altera-esta-chave-em-producao")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -259,6 +259,12 @@ def obter_ano_letivo_destino(dados_formulario):
 
 
 def processar_templates(dados_formulario, tipo_contratacao):
+    erros_juris = validar_juris(dados_formulario)
+    if erros_juris:
+        for erro in erros_juris:
+            print(f"[!] Validação Júri: {erro}")
+        return None, " ".join(erros_juris)
+    
     categoria_bd = CATEGORIA_POR_TIPO.get(tipo_contratacao)
     if not categoria_bd:
         print(f"[!] Erro: Tipo de contratação '{tipo_contratacao}' não mapeado.")
