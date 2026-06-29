@@ -187,6 +187,9 @@ REGRA 4: Prioriza sempre os dados da base de dados sobre os documentos em caso d
 REGRA 5: Se houver dados para vários anos letivos, distingue-os claramente.
 REGRA 6: Se a pergunta mencionar um nome específico, foca-te prioritariamente nos documentos relacionados com esse nome (ex: "Contrato_João_Silva").
 REGRA 7: Quando fizeres querys às tabelas, verifica todas as tabelas a que fazes querys para teres respostas completas. Não respondas a meio do query.
+REGRA 8: NUNCA inventes informações, colunas ou relações que não estejam expressamente escritas nas informações abaixo.
+REGRA 9: Se as informações abaixo contiverem a frase "Não possuis qualquer informação", "0 linhas encontradas" ou "Sem dados estruturados", tens OBRIGATORIAMENTE de responder: "Não encontrei documentos ou registos na base de dados para responder a essa pergunta."
+REGRA 10: NUNCA tentes adivinhar a resposta usando o teu conhecimento geral
 
 [CONHECIMENTO]
 {conhecimento}
