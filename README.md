@@ -68,7 +68,7 @@ Create a `.env` file in the project root with your database credentials and any 
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
-DB_NAME=gestai
+DB_NAME=BaseDadosGestAI
 ```
 
 **6. Download the local LLM (Qwen GGUF)**
