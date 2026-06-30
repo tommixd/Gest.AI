@@ -32,3 +32,57 @@ To run this project locally, you will need:
 ```bash
 git clone [https://github.com/tommixd/Gest.AI.git](https://github.com/tommixd/Gest.AI.git)
 cd Gest.AI
+
+**2. Create and activate a virtual environment** *(recommended)*
+
+```bash
+python3 -m venv venv
+
+# Linux / macOS
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+```
+
+**3. Install the Python dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**4. Set up the MySQL database**
+
+Create a database and import the provided SQL schema:
+
+```bash
+mysql -u root -p -e "CREATE DATABASE basedadosgestai;"
+mysql -u root -p gestai < path/to/BaseDadosGestAI.sql
+```
+
+**5. Configure environment variables**
+
+Create a `.env` file in the project root with your database credentials and any other required settings:
+
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=gestai
+```
+
+**6. Download the local LLM (Qwen GGUF)**
+
+Download the model file and place it in the **same directory as `app.py`**:
+
+```bash
+wget https://huggingface.co/bartowski/Qwen2.5.1-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5.1-Coder-7B-Instruct-Q4_K_M.gguf
+```
+
+**7. Run the application**
+
+```bash
+python app.py
+```
+
+The app should now be running locally — check your terminal output for the address (typically `http://localhost:5000`).
